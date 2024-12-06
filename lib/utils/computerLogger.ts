@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import type { ComputerMessage, ComputerMessageLog } from '../types';
 import { createModuleLogger } from './logger';
+import type { Action } from '../schemas/action';
 
 const logger = createModuleLogger('ComputerLogger');
 
@@ -29,7 +30,11 @@ export class ComputerLogger {
     return new Date().toISOString().replace(/[:.]/g, '').slice(0, 15);
   }
 
-  public logSend(command: unknown): void {
+  /**
+   * Logs a command to the conversation log file
+   * @param command - The command to log
+   */
+  public logSend(command: Action): void {
     fs.appendFileSync(
       this.conversation_log_file,
       JSON.stringify(command) + '\n'

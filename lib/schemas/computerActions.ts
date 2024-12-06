@@ -113,6 +113,7 @@ export type ScreenshotAction = z.infer<typeof ScreenshotAction>;
 export type ComputerParams = z.infer<typeof ComputerParams>;
 export type ComputerAction = z.infer<typeof ComputerAction>;
 
+// Export schemas and error class
 export {
   MouseMoveAction,
   LeftClickDragAction,
