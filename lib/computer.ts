@@ -138,6 +138,7 @@ export class Computer extends EventEmitter implements IComputer {
   private onMessage(message: MessageEvent) {
     const parsedMessage = this.options.parseMessage(message);
     this.setUpdatedAt(parsedMessage.timestamp);
+    this.logger.logReceive(parsedMessage);
     this.handleConnectionMessage(parsedMessage);
     this.options.onMessage(parsedMessage);
   }
@@ -213,10 +214,12 @@ export class Computer extends EventEmitter implements IComputer {
    * @param data Data to send (will be JSON stringified if not a string)
    * @throws Error if not connected
    */
-  public async send(data: unknown): Promise<void> {
+  public async send(data: Action): Promise<void> {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
       throw new Error('WebSocket is not connected');
     }
+
+    this.logger.logSend(data);
 
     const processed = this.options.beforeSend?.(data) ?? data;
     const message =

@@ -1,33 +1,38 @@
 import fs from 'fs';
 import path from 'path';
-import type { ComputerMessage, ComputerMessageLog } from '../types';
+import {
+  LogConfig,
+  type ComputerMessage,
+  type ComputerMessageLog,
+} from '../types';
 import { createModuleLogger } from './logger';
 import type { Action } from '../schemas/action';
 
 const logger = createModuleLogger('ComputerLogger');
 
 export class ComputerLogger {
-  private base_dir: string;
-  private conversation_file: string;
-  private run_dir: string;
-  private conversation_log_file: string;
+  private logDir: string;
+  private conversationFile: string;
+  private runDir: string;
+  private conversationLogFile: string;
 
-  constructor(baseDir: string = 'computer_logs') {
-    this.base_dir = baseDir;
-    this.conversation_file = 'conversation.jsonl';
-    this.run_dir = path.join(this.base_dir, this.getTimestamp());
-    logger.debug(`Creating run directory: ${this.run_dir}`);
-    this.conversation_log_file = path.join(
-      this.run_dir,
-      this.conversation_file
-    );
+  constructor(
+    options: {
+      logDir?: string;
+      logConversation?: boolean;
+      logScreenshot?: boolean;
+      runDir?: string;
+    } = {}
+  ) {
+    const parsedOptions = LogConfig.parse(options);
+    this.logDir = parsedOptions.logDir;
+    this.conversationFile = 'conversation.jsonl';
+    this.runDir = path.join(this.logDir, parsedOptions.runDir);
+    logger.debug(`Creating run directory: ${this.runDir}`);
+    this.conversationLogFile = path.join(this.runDir, this.conversationFile);
 
-    fs.mkdirSync(this.base_dir, { recursive: true });
-    fs.mkdirSync(this.run_dir, { recursive: true });
-  }
-
-  private getTimestamp(): string {
-    return new Date().toISOString().replace(/[:.]/g, '').slice(0, 15);
+    fs.mkdirSync(this.logDir, { recursive: true });
+    fs.mkdirSync(this.runDir, { recursive: true });
   }
 
   /**
@@ -35,10 +40,7 @@ export class ComputerLogger {
    * @param command - The command to log
    */
   public logSend(command: Action): void {
-    fs.appendFileSync(
-      this.conversation_log_file,
-      JSON.stringify(command) + '\n'
-    );
+    fs.appendFileSync(this.conversationLogFile, JSON.stringify(command) + '\n');
   }
 
   public logReceive(message: ComputerMessage): void {
@@ -51,7 +53,7 @@ export class ComputerLogger {
     delete messageDict.result.base64_image;
 
     fs.appendFileSync(
-      this.conversation_log_file,
+      this.conversationLogFile,
       JSON.stringify(messageDict) + '\n'
     );
   }
@@ -59,7 +61,7 @@ export class ComputerLogger {
   private logScreenshot(message: ComputerMessage): string | null {
     if (message.result.base64_image) {
       const screenshot_file = path.join(
-        this.run_dir,
+        this.runDir,
         `screenshot_${message.timestamp}.png`
       );
       logger.debug(`Logging screenshot to: ${screenshot_file}`);
@@ -71,10 +73,10 @@ export class ComputerLogger {
   }
 
   public cleanup(): void {
-    logger.debug(`Cleaning up run directory: ${this.run_dir}`);
-    fs.readdirSync(this.run_dir).forEach((file) => {
-      fs.unlinkSync(path.join(this.run_dir, file));
+    logger.debug(`Cleaning up run directory: ${this.runDir}`);
+    fs.readdirSync(this.runDir).forEach((file) => {
+      fs.unlinkSync(path.join(this.runDir, file));
     });
-    fs.rmdirSync(this.run_dir);
+    fs.rmdirSync(this.runDir);
   }
 }

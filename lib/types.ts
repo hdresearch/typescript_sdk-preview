@@ -9,9 +9,20 @@ import 'dotenv/config';
 export const HDRConfig = z.object({
   api_key: z.string().default(process.env.HDR_API_KEY || ''),
   base_url: z.string().default('wss://api.hdr.is/compute/ws'),
+  log_dir: z.string().default('./computer_logs'),
+  log_conversation: z.boolean().default(true),
 });
 export type HDRConfig = z.infer<typeof HDRConfig>;
 
+export const LogConfig = z.object({
+  logDir: z.string().default('./computer_logs'),
+  runDir: z.string().default(new Date().toISOString()),
+  logScreenshot: z.boolean().default(true),
+  logConversation: z.boolean().default(true),
+});
+export type LogConfig = z.infer<typeof LogConfig>;
+
+/**
 /**
  * Result returned from executing a tool/command
  * @property output - Output data from the tool execution
