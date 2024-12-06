@@ -20,11 +20,13 @@
     "typescript": "^5.0.0"
   },
   "dependencies": {
+    "dotenv": "^16.4.7",
     "husky": "^9.1.7",
     "lint-staged": "^15.2.10",
     "pino": "^9.5.0",
     "pino-pretty": "^13.0.0",
-    "ws": "^8.18.0"
+    "ws": "^8.18.0",
+    "zod": "^3.23.8"
   },
   "exports": {
     "require": "./dist/index.cjs",

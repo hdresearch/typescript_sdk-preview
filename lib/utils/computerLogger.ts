@@ -1,6 +1,9 @@
 import fs from 'fs';
 import path from 'path';
-import type { ComputerMessage } from '../types';
+import type { ComputerMessage, ComputerMessageLog } from '../types';
+import { createModuleLogger } from './logger';
+
+const logger = createModuleLogger('ComputerLogger');
 
 export class ComputerLogger {
   private base_dir: string;
@@ -12,6 +15,7 @@ export class ComputerLogger {
     this.base_dir = baseDir;
     this.conversation_file = 'conversation.jsonl';
     this.run_dir = path.join(this.base_dir, this.getTimestamp());
+    logger.debug(`Creating run directory: ${this.run_dir}`);
     this.conversation_log_file = path.join(
       this.run_dir,
       this.conversation_file
@@ -33,10 +37,11 @@ export class ComputerLogger {
   }
 
   public logReceive(message: ComputerMessage): void {
+    logger.debug(`Logging message: ${JSON.stringify(message)}`);
     const screenshot_file = this.logScreenshot(message);
-    const messageDict = { ...message };
+    let messageDict: ComputerMessageLog = { ...message };
     if (screenshot_file) {
-      messageDict.result.screenshot_file = screenshot_file;
+      messageDict.screenshot_file = screenshot_file;
     }
     delete messageDict.result.base64_image;
 
@@ -52,6 +57,7 @@ export class ComputerLogger {
         this.run_dir,
         `screenshot_${message.timestamp}.png`
       );
+      logger.debug(`Logging screenshot to: ${screenshot_file}`);
       const imageBuffer = Buffer.from(message.result.base64_image, 'base64');
       fs.writeFileSync(screenshot_file, imageBuffer);
       return screenshot_file;
@@ -60,6 +66,7 @@ export class ComputerLogger {
   }
 
   public cleanup(): void {
+    logger.debug(`Cleaning up run directory: ${this.run_dir}`);
     fs.readdirSync(this.run_dir).forEach((file) => {
       fs.unlinkSync(path.join(this.run_dir, file));
     });
