@@ -1,4 +1,4 @@
-import { WebSocket, type Event, type MessageEvent } from 'ws';
+import { WebSocket, type MessageEvent } from 'ws';
 import { ComputerMessage, HDRConfig } from './types';
 import { ComputerLogger } from './utils/computerLogger';
 import { createModuleLogger } from './utils/logger';
@@ -29,14 +29,14 @@ export interface IComputer {
 
 interface ComputerOptions {
   // Required handlers
-  onMessage: (message: MessageEvent) => void | Promise<void>;
-  parseMessage: (message: MessageEvent) => any;
+  onMessage: (message: ComputerMessage) => void | Promise<void>;
+  parseMessage: (message: MessageEvent) => ComputerMessage;
 
   // Optional handlers
   onOpen?: () => void | Promise<void>;
   onError?: (error: Error) => void;
   onClose?: (code: number, reason: string) => void;
-  beforeSend?: (data: any) => any;
+  beforeSend?: (data: unknown) => unknown;
 }
 
 const defaultOptions: ComputerOptions = {
@@ -140,7 +140,7 @@ export class Computer extends EventEmitter implements IComputer {
     });
   }
 
-  public async send(data: any): Promise<void> {
+  public async send(data: unknown): Promise<void> {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
       throw new Error('WebSocket is not connected');
     }

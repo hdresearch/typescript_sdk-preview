@@ -1,10 +1,10 @@
-import pino from "pino";
+import pino from 'pino';
 
 const transport = pino.transport({
-  target: "pino-pretty",
+  target: 'pino-pretty',
   options: {
-    translateTime: "HH:MM:ss Z",
-    ignore: "pid,hostname",
+    translateTime: 'HH:MM:ss Z',
+    ignore: 'pid,hostname',
     colorize: true,
     levelFirst: true,
   },
@@ -12,9 +12,9 @@ const transport = pino.transport({
 
 export const logger = pino(
   {
-    level: process.env.LOG_LEVEL || "info",
+    level: process.env.LOG_LEVEL || 'info',
     base: {
-      env: process.env.NODE_ENV || "development",
+      env: process.env.NODE_ENV || 'development',
     },
   },
   transport

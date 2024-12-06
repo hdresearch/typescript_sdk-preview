@@ -29,7 +29,7 @@ export class ComputerLogger {
     return new Date().toISOString().replace(/[:.]/g, '').slice(0, 15);
   }
 
-  public logSend(command: any): void {
+  public logSend(command: unknown): void {
     fs.appendFileSync(
       this.conversation_log_file,
       JSON.stringify(command) + '\n'
@@ -39,7 +39,7 @@ export class ComputerLogger {
   public logReceive(message: ComputerMessage): void {
     logger.debug(`Logging message: ${JSON.stringify(message)}`);
     const screenshot_file = this.logScreenshot(message);
-    let messageDict: ComputerMessageLog = { ...message };
+    const messageDict: ComputerMessageLog = { ...message };
     if (screenshot_file) {
       messageDict.screenshot_file = screenshot_file;
     }
