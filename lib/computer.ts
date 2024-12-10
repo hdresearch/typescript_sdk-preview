@@ -35,12 +35,15 @@ export interface IComputer {
 /**
  * Configuration options for customizing Computer behavior
  */
-interface ComputerOptions {
-  /** Required handler for processing incoming messages */
+export interface ComputerOptions {
+  /** Base URL for the WebSocket connection */
+  baseUrl?: string;
+  /** API key for authentication */
+  apiKey?: string;
+  /** Handler for processing incoming messages */
   onMessage: (message: ComputerMessage) => void | Promise<void>;
-  /** Required handler for parsing raw WebSocket messages */
-  parseMessage: (message: MessageEvent) => ComputerMessage;
-
+  /** Handler for parsing raw WebSocket messages */
+  parseMessage: (message: MessageEvent) => void | ComputerMessage;
   /** Optional handler called when connection is established */
   onOpen?: () => void | Promise<void>;
   /** Optional handler for connection errors */
@@ -59,8 +62,7 @@ const defaultOptions: ComputerOptions = {
   onMessage: () => {},
   onError: () => {},
   onClose: () => {},
-  parseMessage: (message: MessageEvent) =>
-    ComputerMessage.parse(JSON.parse(message.toString())),
+  parseMessage: () => {},
 };
 
 /**
@@ -94,16 +96,12 @@ export class Computer extends EventEmitter implements IComputer {
    * @param apiKey Authentication API key
    * @param options Configuration options
    */
-  constructor(
-    baseUrl: string,
-    apiKey: string,
-    options: Partial<ComputerOptions> = {}
-  ) {
+  constructor(options: Partial<ComputerOptions> = {}) {
     super();
     this.options = { ...defaultOptions, ...options };
     this.config = HDRConfig.parse({
-      base_url: baseUrl,
-      api_key: apiKey,
+      base_url: options.baseUrl,
+      api_key: options.apiKey,
     });
     this.logger = new ComputerLogger();
     this.createdAt = new Date().toISOString();
@@ -130,13 +128,18 @@ export class Computer extends EventEmitter implements IComputer {
     this.options.onOpen?.();
   }
 
+  private parseMessage(message: MessageEvent): ComputerMessage {
+    this.options.parseMessage(message);
+    return ComputerMessage.parse(JSON.parse(message.toString()));
+  }
+
   /**
    * Handles incoming WebSocket messages
    * @param message The raw message event from WebSocket
    * @private
    */
   private onMessage(message: MessageEvent) {
-    const parsedMessage = this.options.parseMessage(message);
+    const parsedMessage = this.parseMessage(message);
     this.setUpdatedAt(parsedMessage.timestamp);
     this.logger.logReceive(parsedMessage);
     this.handleConnectionMessage(parsedMessage);
@@ -214,7 +217,7 @@ export class Computer extends EventEmitter implements IComputer {
    * @param data Data to send (will be JSON stringified if not a string)
    * @throws Error if not connected
    */
-  public async send(data: Action): Promise<void> {
+  private async send(data: Action): Promise<void> {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
       throw new Error('WebSocket is not connected');
     }
@@ -229,6 +232,7 @@ export class Computer extends EventEmitter implements IComputer {
 
   /**
    * Executes a command on the connected computer
+   * This method will connect to a computer if not already connected
    * @param command The action to execute
    * @returns Promise resolving to the computer's response
    */
@@ -238,7 +242,7 @@ export class Computer extends EventEmitter implements IComputer {
 
     return new Promise((resolve) => {
       const handleMessage = (message: MessageEvent) => {
-        const response = this.options.parseMessage(message);
+        const response = this.parseMessage(message);
         this.removeListener('message', handleMessage);
         resolve(response);
       };
