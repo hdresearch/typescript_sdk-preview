@@ -1,14 +1,11 @@
 import { describe, it, expect, beforeAll, afterAll } from 'bun:test';
 import { Computer } from '../lib/computer';
-import { HDRConfig } from '../lib/types';
 
 describe('Computer Tests', () => {
   let computer: Computer;
-  let config: HDRConfig;
 
   beforeAll(async () => {
-    config = HDRConfig.parse({});
-    computer = new Computer(config.base_url, config.api_key);
+    computer = new Computer();
     await computer.connect();
   });
 
