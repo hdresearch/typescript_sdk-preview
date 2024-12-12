@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'bun:test';
 import { Computer } from '../lib/computer';
-import { env } from 'bun';
+import { env } from 'process';
 
 describe('Computer Tests', () => {
   let computer: Computer;
@@ -29,7 +29,7 @@ describe('Computer Tests', () => {
         action: 'cursor_position',
       },
     });
-    expect(message.output.output).toMatch(/X=\d+,Y=\d+/);
+    expect(message.tool_result.output).toMatch(/X=\d+,Y=\d+/);
   });
 
   it('should handle screenshot', async () => {
@@ -42,7 +42,7 @@ describe('Computer Tests', () => {
       tool: 'bash',
       params: { command: 'echo hello world' },
     });
-    expect(message.output.output).toBe('hello world');
+    expect(message.tool_result.output).toBe('hello world');
   });
 
   afterAll(async () => {

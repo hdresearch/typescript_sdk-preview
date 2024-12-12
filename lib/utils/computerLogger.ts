@@ -50,7 +50,7 @@ export class ComputerLogger {
     if (screenshot_file) {
       messageDict.screenshot_file = screenshot_file;
     }
-    messageDict.output.base64_image = null;
+    messageDict.tool_result.base64_image = null;
 
     fs.appendFileSync(
       this.conversationLogFile,
@@ -59,13 +59,16 @@ export class ComputerLogger {
   }
 
   private logScreenshot(message: ComputerMessage): string | null {
-    if (message.output.base64_image) {
+    if (message.tool_result.base64_image) {
       const screenshot_file = path.join(
         this.runDir,
         `screenshot_${message.metadata.request_timestamp}.png`
       );
       logger.debug(`Logging screenshot to: ${screenshot_file}`);
-      const imageBuffer = Buffer.from(message.output.base64_image, 'base64');
+      const imageBuffer = Buffer.from(
+        message.tool_result.base64_image,
+        'base64'
+      );
       fs.writeFileSync(screenshot_file, imageBuffer);
       return screenshot_file;
     }

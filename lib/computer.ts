@@ -174,7 +174,7 @@ export class Computer extends EventEmitter implements IComputer {
    */
   private handleConnectionMessage(message: ComputerMessage) {
     // We assume that the connection message, and only the connection message, will have the following parse succeed
-    const tryParse = MachineMetadata.safeParse(message.output.system);
+    const tryParse = MachineMetadata.safeParse(message.tool_result.system);
 
     if (tryParse.data) {
       const machineMetadata = tryParse.data;
@@ -303,9 +303,9 @@ export class Computer extends EventEmitter implements IComputer {
       params: { action: 'screenshot' },
     });
 
-    if (!message.output.base64_image) {
+    if (!message.tool_result.base64_image) {
       throw new Error('No screenshot data received');
     }
-    return message.output.base64_image;
+    return message.tool_result.base64_image;
   }
 }

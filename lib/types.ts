@@ -45,8 +45,8 @@ const Metadata = z.object({
 type Metadata = z.infer<typeof Metadata>;
 
 export const ComputerMessage = z.object({
-  input: z.string(),
-  output: ToolResult,
+  raw_input: z.string(),
+  tool_result: ToolResult,
   metadata: Metadata,
 });
 export type ComputerMessage = z.infer<typeof ComputerMessage>;
