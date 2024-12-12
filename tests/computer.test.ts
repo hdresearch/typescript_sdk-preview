@@ -1,11 +1,14 @@
 import { describe, it, expect, beforeAll, afterAll } from 'bun:test';
 import { Computer } from '../lib/computer';
+import { env } from 'process';
 
 describe('Computer Tests', () => {
   let computer: Computer;
 
   beforeAll(async () => {
-    computer = new Computer();
+    const baseUrl = env.TEST_BASE_URL;
+
+    computer = new Computer({ baseUrl });
     await computer.connect();
   });
 
@@ -26,7 +29,7 @@ describe('Computer Tests', () => {
         action: 'cursor_position',
       },
     });
-    expect(message.result.output).toMatch(/X=\d+,Y=\d+/);
+    expect(message.tool_result.output).toMatch(/X=\d+,Y=\d+/);
   });
 
   it('should handle screenshot', async () => {
@@ -39,7 +42,7 @@ describe('Computer Tests', () => {
       tool: 'bash',
       params: { command: 'echo hello world' },
     });
-    expect(message.result.output).toBe('hello world');
+    expect(message.tool_result.output).toBe('hello world');
   });
 
   afterAll(async () => {

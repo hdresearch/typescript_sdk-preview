@@ -1,5 +1,5 @@
 import { WebSocket, type MessageEvent } from 'ws';
-import { ComputerMessage, HDRConfig } from './types';
+import { ComputerMessage, HDRConfig, MachineMetadata } from './types';
 import { ComputerLogger } from './utils/computerLogger';
 import { createModuleLogger } from './utils/logger';
 import { EventEmitter } from 'events';
@@ -140,7 +140,7 @@ export class Computer extends EventEmitter implements IComputer {
    */
   private onMessage(message: MessageEvent) {
     const parsedMessage = this.parseMessage(message);
-    this.setUpdatedAt(parsedMessage.timestamp);
+    this.setUpdatedAt(parsedMessage.metadata.response_timestamp.getTime());
     this.logger.logReceive(parsedMessage);
     this.handleConnectionMessage(parsedMessage);
     this.options.onMessage(parsedMessage);
@@ -173,10 +173,15 @@ export class Computer extends EventEmitter implements IComputer {
    * @private
    */
   private handleConnectionMessage(message: ComputerMessage) {
-    if (message.result.output.message) {
-      this.sessionId = message.session_id;
-      this.host = message.result.output.data.host;
-      this.accessToken = message.result.output.data.access_token;
+    // We assume that the connection message, and only the connection message, will have the following parse succeed
+    const tryParse = MachineMetadata.safeParse(message.tool_result.system);
+
+    if (tryParse.data) {
+      const machineMetadata = tryParse.data;
+
+      this.sessionId = message.metadata.session_id;
+      this.host = machineMetadata.hostname;
+      this.accessToken = machineMetadata.access_token;
     }
   }
 
@@ -298,9 +303,9 @@ export class Computer extends EventEmitter implements IComputer {
       params: { action: 'screenshot' },
     });
 
-    if (!message.result.base64_image) {
+    if (!message.tool_result.base64_image) {
       throw new Error('No screenshot data received');
     }
-    return message.result.base64_image;
+    return message.tool_result.base64_image;
   }
 }

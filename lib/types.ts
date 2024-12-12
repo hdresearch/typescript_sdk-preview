@@ -22,34 +22,32 @@ export const LogConfig = z.object({
 });
 export type LogConfig = z.infer<typeof LogConfig>;
 
-/**
-/**
- * Result returned from executing a tool/command
- * @property output - Output data from the tool execution
- * @property base64_image - Optional base64 encoded screenshot
- * @property error - Optional error message if the tool failed
- * @property system - Optional system message/metadata
- */
-export const ToolResult = z.object({
-  output: z.any(),
-  base64_image: z.string().nullish(),
-  error: z.string().nullish(),
-  system: z.string().nullish(),
+const ToolResult = z.object({
+  output: z.string().nullable(),
+  error: z.string().nullable(),
+  base64_image: z.string().nullable(),
+  system: z.string().nullable(),
 });
-export type ToolResult = z.infer<typeof ToolResult>;
+type ToolResult = z.infer<typeof ToolResult>;
 
-/**
- * Message format for communication with the Computer
- * @property session_id - Unique identifier for the computer session
- * @property timestamp - Unix timestamp of when the message was created
- * @property result - Result data from tool execution
- * @property error - Optional error message if something went wrong
- */
+const Metadata = z.object({
+  session_id: z.string().uuid(),
+  message_id: z.string().uuid(),
+  request_timestamp: z
+    .string()
+    .datetime()
+    .transform((x) => new Date(x)),
+  response_timestamp: z
+    .string()
+    .datetime()
+    .transform((x) => new Date(x)),
+});
+type Metadata = z.infer<typeof Metadata>;
+
 export const ComputerMessage = z.object({
-  session_id: z.string(),
-  timestamp: z.number(),
-  result: ToolResult,
-  error: z.string().nullish(),
+  raw_input: z.string(),
+  tool_result: ToolResult,
+  metadata: Metadata,
 });
 export type ComputerMessage = z.infer<typeof ComputerMessage>;
 
@@ -57,3 +55,14 @@ export const ComputerMessageLog = ComputerMessage.extend({
   screenshot_file: z.string().optional(),
 });
 export type ComputerMessageLog = z.infer<typeof ComputerMessageLog>;
+
+// The data payload that is expected to be stringified in `output.system` on connection.
+export const MachineMetadata = z.object({
+  display_height: z.number().nullable(),
+  display_width: z.number().nullable(),
+  display_num: z.number().nullable(),
+  arch: z.string().nullable(),
+  hostname: z.string().nullable(),
+  access_token: z.string().nullable(),
+});
+export type MachineMetadata = z.infer<typeof MachineMetadata>;
