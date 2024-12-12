@@ -140,9 +140,10 @@ export class Computer extends EventEmitter implements IComputer {
    */
   private onMessage(message: MessageEvent) {
     const parsedMessage = this.parseMessage(message);
-    this.setUpdatedAt(parsedMessage.timestamp);
+    this.setUpdatedAt(parsedMessage.metadata.response_timestamp.getTime());
     this.logger.logReceive(parsedMessage);
-    this.handleConnectionMessage(parsedMessage);
+    // TODO: This isn't supported by Hudson rn; what is this?  - asebexen
+    // this.handleConnectionMessage(parsedMessage);
     this.options.onMessage(parsedMessage);
   }
 
@@ -172,13 +173,14 @@ export class Computer extends EventEmitter implements IComputer {
    * @param message The parsed computer message
    * @private
    */
-  private handleConnectionMessage(message: ComputerMessage) {
-    if (message.result.output.message) {
-      this.sessionId = message.session_id;
-      this.host = message.result.output.data.host;
-      this.accessToken = message.result.output.data.access_token;
-    }
-  }
+  // TODO: This isn't supported by Hudson rn; what is this?  - asebexen
+//   private handleConnectionMessage(message: ComputerMessage) {
+//     if (message.result.output.message) {
+//       this.sessionId = message.session_id;
+//       this.host = message.result.output.data.host;
+//       this.accessToken = message.result.output.data.access_token;
+//     }
+//   }
 
   /**
    * Establishes a WebSocket connection to the computer
@@ -298,9 +300,9 @@ export class Computer extends EventEmitter implements IComputer {
       params: { action: 'screenshot' },
     });
 
-    if (!message.result.base64_image) {
+    if (!message.output.base64_image) {
       throw new Error('No screenshot data received');
     }
-    return message.result.base64_image;
+    return message.output.base64_image;
   }
 }

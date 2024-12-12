@@ -12,12 +12,12 @@ describe('Computer Tests', () => {
   it('should handle connect', async () => {
     expect(computer.isConnected()).toBe(true);
   });
-
-  it('should handle connection message', async () => {
-    expect(computer.sessionId).toBeDefined();
-    expect(computer.host).toBeDefined();
-    expect(computer.accessToken).toBeDefined();
-  });
+  // TODO: This isn't supported by Hudson atm. What is this?  - asebexen
+//   it('should handle connection message', async () => {
+//     expect(computer.sessionId).toBeDefined();
+//     expect(computer.host).toBeDefined();
+//     expect(computer.accessToken).toBeDefined();
+//   });
 
   it('should handle send message', async () => {
     const message = await computer.execute({
@@ -26,7 +26,7 @@ describe('Computer Tests', () => {
         action: 'cursor_position',
       },
     });
-    expect(message.result.output).toMatch(/X=\d+,Y=\d+/);
+    expect(message.output.output).toMatch(/X=\d+,Y=\d+/);
   });
 
   it('should handle screenshot', async () => {
@@ -39,7 +39,7 @@ describe('Computer Tests', () => {
       tool: 'bash',
       params: { command: 'echo hello world' },
     });
-    expect(message.result.output).toBe('hello world');
+    expect(message.output.output).toBe('hello world');
   });
 
   afterAll(async () => {
