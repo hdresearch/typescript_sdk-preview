@@ -33,8 +33,14 @@ type ToolResult = z.infer<typeof ToolResult>;
 const Metadata = z.object({
   session_id: z.string().uuid(),
   message_id: z.string().uuid(),
-  request_timestamp: z.string().datetime().transform(x => new Date(x)),
-  response_timestamp: z.string().datetime().transform(x => new Date(x)),
+  request_timestamp: z
+    .string()
+    .datetime()
+    .transform((x) => new Date(x)),
+  response_timestamp: z
+    .string()
+    .datetime()
+    .transform((x) => new Date(x)),
 });
 type Metadata = z.infer<typeof Metadata>;
 
@@ -49,3 +55,14 @@ export const ComputerMessageLog = ComputerMessage.extend({
   screenshot_file: z.string().optional(),
 });
 export type ComputerMessageLog = z.infer<typeof ComputerMessageLog>;
+
+// The data payload that is expected to be stringified in `output.system` on connection.
+export const MachineMetadata = z.object({
+  display_height: z.number().nullable(),
+  display_width: z.number().nullable(),
+  display_num: z.number().nullable(),
+  arch: z.string().nullable(),
+  hostname: z.string().nullable(),
+  access_token: z.string().nullable(),
+});
+export type MachineMetadata = z.infer<typeof MachineMetadata>;

@@ -1,23 +1,26 @@
 import { describe, it, expect, beforeAll, afterAll } from 'bun:test';
 import { Computer } from '../lib/computer';
+import { env } from 'bun';
 
 describe('Computer Tests', () => {
   let computer: Computer;
 
   beforeAll(async () => {
-    computer = new Computer();
+    const baseUrl = env.TEST_BASE_URL;
+
+    computer = new Computer({ baseUrl });
     await computer.connect();
   });
 
   it('should handle connect', async () => {
     expect(computer.isConnected()).toBe(true);
   });
-  // TODO: This isn't supported by Hudson atm. What is this?  - asebexen
-//   it('should handle connection message', async () => {
-//     expect(computer.sessionId).toBeDefined();
-//     expect(computer.host).toBeDefined();
-//     expect(computer.accessToken).toBeDefined();
-//   });
+
+  it('should handle connection message', async () => {
+    expect(computer.sessionId).toBeDefined();
+    expect(computer.host).toBeDefined();
+    expect(computer.accessToken).toBeDefined();
+  });
 
   it('should handle send message', async () => {
     const message = await computer.execute({

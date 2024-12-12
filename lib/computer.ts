@@ -1,5 +1,5 @@
 import { WebSocket, type MessageEvent } from 'ws';
-import { ComputerMessage, HDRConfig } from './types';
+import { ComputerMessage, HDRConfig, MachineMetadata } from './types';
 import { ComputerLogger } from './utils/computerLogger';
 import { createModuleLogger } from './utils/logger';
 import { EventEmitter } from 'events';
@@ -142,8 +142,7 @@ export class Computer extends EventEmitter implements IComputer {
     const parsedMessage = this.parseMessage(message);
     this.setUpdatedAt(parsedMessage.metadata.response_timestamp.getTime());
     this.logger.logReceive(parsedMessage);
-    // TODO: This isn't supported by Hudson rn; what is this?  - asebexen
-    // this.handleConnectionMessage(parsedMessage);
+    this.handleConnectionMessage(parsedMessage);
     this.options.onMessage(parsedMessage);
   }
 
@@ -173,14 +172,18 @@ export class Computer extends EventEmitter implements IComputer {
    * @param message The parsed computer message
    * @private
    */
-  // TODO: This isn't supported by Hudson rn; what is this?  - asebexen
-//   private handleConnectionMessage(message: ComputerMessage) {
-//     if (message.result.output.message) {
-//       this.sessionId = message.session_id;
-//       this.host = message.result.output.data.host;
-//       this.accessToken = message.result.output.data.access_token;
-//     }
-//   }
+  private handleConnectionMessage(message: ComputerMessage) {
+    // We assume that the connection message, and only the connection message, will have the following parse succeed
+    const tryParse = MachineMetadata.safeParse(message.output.system);
+
+    if (tryParse.data) {
+      const machineMetadata = tryParse.data;
+
+      this.sessionId = message.metadata.session_id;
+      this.host = machineMetadata.hostname;
+      this.accessToken = machineMetadata.access_token;
+    }
+  }
 
   /**
    * Establishes a WebSocket connection to the computer
