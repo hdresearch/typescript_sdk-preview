@@ -1,5 +1,16 @@
 import { WebSocket, type MessageEvent } from 'ws';
-import { ComputerMessage, HDRConfig, MachineMetadata } from './types';
+import {
+  ComputerMessage,
+  HDRConfig,
+  MachineMetadata,
+  type ToolI,
+} from './types';
+
+import {
+  bashTool,
+  computerTool,
+  // editTool
+} from './tools';
 import { ComputerLogger } from './utils/computerLogger';
 import { createModuleLogger } from './utils/logger';
 import { EventEmitter } from 'events';
@@ -40,6 +51,8 @@ export interface ComputerOptions {
   baseUrl?: string;
   /** API key for authentication */
   apiKey?: string;
+  /** Tools available to the computer */
+  tools?: Set<ToolI>;
   /** Handler for processing incoming messages */
   onMessage: (message: ComputerMessage) => void | Promise<void>;
   /** Handler for parsing raw WebSocket messages */
@@ -58,11 +71,18 @@ export interface ComputerOptions {
  * Default configuration options for Computer instances
  */
 const defaultOptions: ComputerOptions = {
+  tools: new Set([
+    bashTool,
+    computerTool,
+    // editTool
+  ]),
   onOpen: () => {},
   onMessage: () => {},
   onError: () => {},
   onClose: () => {},
-  parseMessage: () => {},
+  parseMessage: (message: MessageEvent) => {
+    return ComputerMessage.parse(JSON.parse(message.toString()));
+  },
 };
 
 /**
@@ -86,9 +106,9 @@ export class Computer extends EventEmitter implements IComputer {
   /** Unique identifier for current session */
   sessionId: string | null = null;
   /** Connected computer's hostname */
-  host: string | null = null;
-  /** Authentication token for current session */
-  accessToken: string | null = null;
+  machineMetadata: MachineMetadata | null = null;
+  /** Tools available to the computer */
+  tools: Set<ToolI> = new Set();
 
   /**
    * Creates a new Computer instance
@@ -173,15 +193,23 @@ export class Computer extends EventEmitter implements IComputer {
    * @private
    */
   private handleConnectionMessage(message: ComputerMessage) {
-    // We assume that the connection message, and only the connection message, will have the following parse succeed
     const tryParse = MachineMetadata.safeParse(message.tool_result.system);
 
-    if (tryParse.data) {
+    if (tryParse.success) {
       const machineMetadata = tryParse.data;
-
+      this.machineMetadata = machineMetadata;
       this.sessionId = message.metadata.session_id;
-      this.host = machineMetadata.hostname;
-      this.accessToken = machineMetadata.access_token;
+
+      // Update computer tool with actual display dimensions
+      const updatedComputerTool = {
+        ...computerTool,
+        display_height_px: machineMetadata.display_height ?? 0,
+        display_width_px: machineMetadata.display_width ?? 0,
+      };
+
+      // Replace the existing computer tool with updated version
+      this.options.tools?.delete(computerTool);
+      this.options.tools?.add(updatedComputerTool);
     }
   }
 
@@ -243,7 +271,7 @@ export class Computer extends EventEmitter implements IComputer {
    */
   public async execute(command: Action): Promise<ComputerMessage> {
     await this.ensureConnected();
-    logger.info('Sending command:', JSON.stringify(command));
+    logger.info({ command }, 'Sending command:');
 
     return new Promise((resolve) => {
       const handleMessage = (message: MessageEvent) => {
@@ -307,5 +335,15 @@ export class Computer extends EventEmitter implements IComputer {
       throw new Error('No screenshot data received');
     }
     return message.tool_result.base64_image;
+  }
+
+  public registerTool(tools: ToolI[]) {
+    tools.forEach((tool) => {
+      this.options.tools?.add(tool);
+    });
+  }
+
+  public listTools(): ToolI[] {
+    return Array.from(this.options.tools ?? new Set());
   }
 }

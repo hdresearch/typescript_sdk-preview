@@ -60,9 +60,10 @@ export class ComputerLogger {
 
   private logScreenshot(message: ComputerMessage): string | null {
     if (message.tool_result.base64_image) {
+      const timestamp = message.metadata.request_timestamp.toISOString();
       const screenshot_file = path.join(
         this.runDir,
-        `screenshot_${message.metadata.request_timestamp}.png`
+        `screenshot_${timestamp}.png`
       );
       logger.debug(`Logging screenshot to: ${screenshot_file}`);
       const imageBuffer = Buffer.from(

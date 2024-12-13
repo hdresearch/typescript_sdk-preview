@@ -8,7 +8,7 @@ import 'dotenv/config';
  */
 export const HDRConfig = z.object({
   api_key: z.string().default(process.env.HDR_API_KEY || ''),
-  base_url: z.string().default('wss://api.hdr.is/compute/ws'),
+  base_url: z.string().default('wss://api.hdr.is/compute/ephemeral'),
   log_dir: z.string().default('./computer_logs'),
   log_conversation: z.boolean().default(true),
 });
@@ -22,13 +22,13 @@ export const LogConfig = z.object({
 });
 export type LogConfig = z.infer<typeof LogConfig>;
 
-const ToolResult = z.object({
+export const ToolResult = z.object({
   output: z.string().nullable(),
   error: z.string().nullable(),
   base64_image: z.string().nullable(),
   system: z.string().nullable(),
 });
-type ToolResult = z.infer<typeof ToolResult>;
+export type ToolResult = z.infer<typeof ToolResult>;
 
 const Metadata = z.object({
   session_id: z.string().uuid(),
@@ -66,3 +66,10 @@ export const MachineMetadata = z.object({
   access_token: z.string().nullable(),
 });
 export type MachineMetadata = z.infer<typeof MachineMetadata>;
+
+export interface ToolI {
+  name: string;
+  type: string;
+  display_height_px?: number;
+  display_width_px?: number;
+}
