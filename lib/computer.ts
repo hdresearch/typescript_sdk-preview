@@ -6,7 +6,11 @@ import {
   type ToolI,
 } from './types';
 
-import { bashTool, computerTool, editTool } from './tools';
+import {
+  bashTool,
+  computerTool,
+  // editTool
+} from './tools';
 import { ComputerLogger } from './utils/computerLogger';
 import { createModuleLogger } from './utils/logger';
 import { EventEmitter } from 'events';
@@ -67,7 +71,11 @@ export interface ComputerOptions {
  * Default configuration options for Computer instances
  */
 const defaultOptions: ComputerOptions = {
-  tools: new Set([bashTool, computerTool, editTool]),
+  tools: new Set([
+    bashTool,
+    computerTool,
+    // editTool
+  ]),
   onOpen: () => {},
   onMessage: () => {},
   onError: () => {},

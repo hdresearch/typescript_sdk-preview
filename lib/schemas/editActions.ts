@@ -63,7 +63,7 @@ const EditParams = z.discriminatedUnion('command', [
 // Main EditAction schema
 export const EditAction = z
   .object({
-    tool: z.literal('edit'),
+    tool: z.literal('str_replace_editor'),
     params: EditParams,
   })
   .describe('File editing operations.');

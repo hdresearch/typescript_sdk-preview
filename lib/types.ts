@@ -8,7 +8,7 @@ import 'dotenv/config';
  */
 export const HDRConfig = z.object({
   api_key: z.string().default(process.env.HDR_API_KEY || ''),
-  base_url: z.string().default('wss://api.hdr.is/compute/ws'),
+  base_url: z.string().default('wss://api.hdr.is/compute/ephemeral'),
   log_dir: z.string().default('./computer_logs'),
   log_conversation: z.boolean().default(true),
 });

@@ -17,7 +17,7 @@ import { logger } from '../lib/utils/logger';
 import { makeToolResult } from './quickstart_utils/utils';
 import { ToolResult } from '../lib/types';
 
-const BASE_URL = 'ws://localhost:8080/ws';
+const BASE_URL = 'wss://api.hdr.is/compute/ephemeral';
 
 // This is the base system prompt
 // This prompt assumes you have all tools enabled.
@@ -58,7 +58,7 @@ async function useComputer(
   if (!computer.isConnected()) {
     throw new Error('Failed to connect to computer');
   }
-  console.log('Tools ', computer.listTools());
+  logger.info({ tools: computer.listTools() }, 'Tools enabled: ');
   while (true) {
     const response = await client.beta.messages.create({
       model: samplingOptions.model,
@@ -72,7 +72,6 @@ async function useComputer(
     const toolResults: BetaToolResultBlockParam[] = [];
 
     async function handleToolResult(block: BetaToolUseBlock) {
-      console.log('block', block);
       const parseAction = Action.safeParse({
         tool: block.name,
         params: block.input,
@@ -133,7 +132,7 @@ async function useComputer(
     }
   }
   computer.close();
-  console.log('Completed task: ', task);
+  logger.info({ task }, 'Completed task: ');
 }
 
 async function main() {
@@ -146,10 +145,15 @@ async function main() {
   // await useComputer('Please close firefox', computer, {});
   // await useComputer('Please use cowsay to say hello', computer, {});
   await useComputer(
-    'Write me a python script to serve a simple webpage that just displays "test", run the server, and then open the webpage in firefox',
+    'Write a simple static python webserver that displays "Hello world!" and then open the webpage in firefox to confirm it is up.',
     computer,
     {}
   );
+  // await useComputer(
+  //   'Navigate to https://hdr.is to and get a feel for the aesthetics of the site. Write me a python webserver that creates a static webpage that displays "Hello world!" in a similar style, run the server, and then open the webpage in firefox',
+  //   computer,
+  //   {}
+  // );
 
   await computer.close();
 }
