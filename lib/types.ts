@@ -70,4 +70,6 @@ export type MachineMetadata = z.infer<typeof MachineMetadata>;
 export interface ToolI {
   name: string;
   type: string;
+  display_height_px?: number;
+  display_width_px?: number;
 }

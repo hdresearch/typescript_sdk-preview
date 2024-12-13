@@ -12,7 +12,7 @@ class ComputerToolError extends Error {
 const MouseMoveAction = z
   .object({
     action: z.literal('mouse_move'),
-    coordinates: z.tuple([z.number().int(), z.number().int()]),
+    coordinate: z.tuple([z.number().int(), z.number().int()]),
   })
   .describe('Move mouse cursor to specific coordinates.');
 

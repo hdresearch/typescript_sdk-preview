@@ -72,8 +72,7 @@ const defaultOptions: ComputerOptions = {
   onMessage: () => {},
   onError: () => {},
   onClose: () => {},
-  parseMessage: (message) => {
-    console.log('message', message);
+  parseMessage: (message: MessageEvent) => {
     return ComputerMessage.parse(JSON.parse(message.toString()));
   },
 };
@@ -186,16 +185,23 @@ export class Computer extends EventEmitter implements IComputer {
    * @private
    */
   private handleConnectionMessage(message: ComputerMessage) {
-    // We assume that the connection message, and only the connection message, will have the following parse succeed
-    console.log('message', message);
     const tryParse = MachineMetadata.safeParse(message.tool_result.system);
 
     if (tryParse.success) {
       const machineMetadata = tryParse.data;
       this.machineMetadata = machineMetadata;
       this.sessionId = message.metadata.session_id;
-    } else {
-      console.log('tryParse', tryParse);
+
+      // Update computer tool with actual display dimensions
+      const updatedComputerTool = {
+        ...computerTool,
+        display_height_px: machineMetadata.display_height ?? 0,
+        display_width_px: machineMetadata.display_width ?? 0,
+      };
+
+      // Replace the existing computer tool with updated version
+      this.options.tools?.delete(computerTool);
+      this.options.tools?.add(updatedComputerTool);
     }
   }
 
@@ -257,7 +263,7 @@ export class Computer extends EventEmitter implements IComputer {
    */
   public async execute(command: Action): Promise<ComputerMessage> {
     await this.ensureConnected();
-    logger.info('Sending command:', JSON.stringify(command));
+    logger.info({ command }, 'Sending command:');
 
     return new Promise((resolve) => {
       const handleMessage = (message: MessageEvent) => {

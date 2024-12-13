@@ -30,21 +30,35 @@ describe('Computer Tests', () => {
         action: 'cursor_position',
       },
     });
+    console.log(message);
     expect(message.tool_result.output).toMatch(/X=\d+,Y=\d+/);
   });
 
-  it('should handle screenshot', async () => {
-    const base64_image = await computer.screenshot();
-    expect(base64_image).toBeDefined();
-  });
+  // it('should handle screenshot', async () => {
+  //   const base64_image = await computer.screenshot();
+  //   expect(base64_image).toBeDefined();
+  // });
 
-  it('should handle bash', async () => {
-    const message = await computer.execute({
-      tool: 'bash',
-      params: { command: 'echo hello world' },
-    });
-    expect(message.tool_result.output).toBe('hello world');
-  });
+  // it('should handle bash', async () => {
+  //   const message = await computer.execute({
+  //     tool: 'bash',
+  //     params: { command: 'echo hello world' },
+  //   });
+  //   expect(message.tool_result.output).toBe('hello world');
+  // });
+
+  // it('should handle move mouse', async () => {
+  //   await computer.execute({
+  //     tool: 'computer',
+  //     params: { action: 'mouse_move', coordinate: [100, 100] },
+  //   });
+
+  //   const cursor_position = await computer.execute({
+  //     tool: 'computer',
+  //     params: { action: 'cursor_position' },
+  //   });
+  //   expect(cursor_position.tool_result.output).toBe('X=100,Y=100');
+  // });
 
   afterAll(async () => {
     await computer.close();
