@@ -1,12 +1,13 @@
 import { describe, it, expect, beforeAll, afterAll } from 'bun:test';
 import { Computer } from '../lib/computer';
-import { env } from 'process';
+import { bashTool, editTool } from '../lib/tools';
+import { computerTool } from '../lib/tools';
 
 describe('Computer Tests', () => {
   let computer: Computer;
 
   beforeAll(async () => {
-    const baseUrl = env.TEST_BASE_URL;
+    const baseUrl = process.env.TEST_BASE_URL;
 
     computer = new Computer({ baseUrl });
     await computer.connect();
@@ -18,8 +19,8 @@ describe('Computer Tests', () => {
 
   it('should handle connection message', async () => {
     expect(computer.sessionId).toBeDefined();
-    expect(computer.host).toBeDefined();
-    expect(computer.accessToken).toBeDefined();
+    expect(computer.machineMetadata).toBeDefined();
+    expect(computer.listTools()).toEqual([bashTool, computerTool, editTool]);
   });
 
   it('should handle send message', async () => {
