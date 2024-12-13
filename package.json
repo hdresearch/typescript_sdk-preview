@@ -41,8 +41,8 @@
     "build": "bun build ./lib/index.ts --outdir ./dist --target node",
     "format": "prettier --write \"**/*.{js,jsx,ts,tsx,json,css,scss,md}\"",
     "format:check": "prettier --check \"**/*.{js,jsx,ts,tsx,json,css,scss,md}\"",
-    "lint": "eslint .",
-    "lint:fix": "eslint . --fix",
+    "lint": "eslint ./lib",
+    "lint:fix": "eslint ./lib --fix",
     "prepare": "husky"
   },
   "type": "module"
