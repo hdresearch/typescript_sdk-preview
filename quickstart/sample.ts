@@ -136,25 +136,18 @@ async function useComputer(
 }
 
 async function main() {
-  // await useComputer(
-  //   'Move your mouse to the center of the screen and the confirm.',
-  //   {}
-  // );
   const computer = new Computer({ baseUrl: BASE_URL });
   await computer.connect();
-  // await useComputer('Please close firefox', computer, {});
-  // await useComputer('Please use cowsay to say hello', computer, {});
+
+  // Here are some additional prompts you can run
+  // Move your mouse to the center of the screen and the confirm.
+  // Please use cowsay to say hello'
+  // Open firefox
   await useComputer(
-    'Write a simple static python webserver that displays "Hello world!" and then open the webpage in firefox to confirm it is up.',
+    'Navigate to https://hdr.is to and get a feel for the aesthetics of the site. Write me a python webserver that creates a static webpage that displays "Hello world!" in a similar style, run the server, and then open the webpage in firefox',
     computer,
     {}
   );
-  // await useComputer(
-  //   'Navigate to https://hdr.is to and get a feel for the aesthetics of the site. Write me a python webserver that creates a static webpage that displays "Hello world!" in a similar style, run the server, and then open the webpage in firefox',
-  //   computer,
-  //   {}
-  // );
-
   await computer.close();
 }
 
