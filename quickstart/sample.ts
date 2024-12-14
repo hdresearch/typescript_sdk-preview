@@ -36,30 +36,56 @@ function systemCapability(computer: Computer) {
   `;
 }
 
+/**
+ * Executes a task on a remote computer using Claude AI and handles the interaction loop
+ *
+ * This function:
+ * 1. Sets up a conversation with Claude using the provided task
+ * 2. Manages a loop of:
+ *    - Getting responses from Claude
+ *    - Executing any tools/commands Claude requests
+ *    - Feeding results back to Claude
+ * 3. Continues until Claude has no more actions to take
+ *
+ * @param task - The natural language instruction/task to give to Claude
+ * @param computer - Instance of Computer class for executing commands
+ * @param options - Optional sampling parameters for Claude (model, tokens etc)
+ */
 async function useComputer(
   task: string,
   computer: Computer,
   options: Partial<DefaultSamplingOptions>
 ) {
+  // Merge provided options with defaults
   const samplingOptions = { ...defaultSamplingOptions, ...options };
   const client = new Anthropic();
+
+  // Initialize conversation history
   const messages: BetaMessageParam[] = [];
 
+  // Add the user's task as first message
   messages.push({
     role: 'user',
     content: task,
   });
 
+  // Create system prompt that tells Claude about the computer's capabilities
   const systemPrompt: BetaTextBlockParam = {
     type: 'text',
     text: systemCapability(computer),
   };
 
+  // Verify computer connection before proceeding
   if (!computer.isConnected()) {
     throw new Error('Failed to connect to computer');
   }
+
+  // Log available tools for debugging
   logger.info({ tools: computer.listTools() }, 'Tools enabled: ');
+
+  // Main interaction loop
   while (true) {
+    // Get Claude's response
     const response = await client.beta.messages.create({
       model: samplingOptions.model,
       messages: messages,
@@ -69,15 +95,23 @@ async function useComputer(
       betas: ['computer-use-2024-10-22'],
     });
 
+    // Store results from any tools Claude uses
     const toolResults: BetaToolResultBlockParam[] = [];
 
+    /**
+     * Handles execution of a single tool use request from Claude
+     *
+     * @param block - The tool use request from Claude
+     */
     async function handleToolResult(block: BetaToolUseBlock) {
+      // Validate the tool request
       const parseAction = Action.safeParse({
         tool: block.name,
         params: block.input,
       });
 
       let result: ToolResult;
+      // Handle invalid tool requests
       if (!parseAction.success) {
         result = ToolResult.parse({
           error: `Tool ${block.name} failed is invalid`,
@@ -94,34 +128,40 @@ async function useComputer(
         return;
       }
 
+      // Log the parsed action for debugging
       logger.debug(JSON.stringify(parseAction.data), 'Parsed action:');
 
+      // Execute the tool request and store result
       const computerResponse = await computer.execute(parseAction.data);
       result = await computerResponse.tool_result;
       if (result) {
         const toolResult = makeToolResult(result, block.id);
         toolResults.push(toolResult);
-        // logger.info({ tool_result: toolResult }, 'Tool result');
       }
     }
 
+    // Process Claude's response content sequentially
     const assistantContent: BetaContentBlock[] = [];
-    // for loop so handleToolResult can be called in order
     for (const content of response.content) {
       assistantContent.push(content);
       if (content.type === 'text') {
+        // Log Claude's text responses
         logger.info(content.text, 'Assistant: ');
       } else if (content.type === 'tool_use') {
+        // Execute and log tool usage
         logger.info({ command: content }, 'Executing: ');
         await handleToolResult(content);
       }
     }
 
+    // Add Claude's response to conversation history
     messages.push({
       role: 'assistant',
       content: assistantContent,
     });
 
+    // If tools were used, add results to conversation
+    // Otherwise end the conversation loop
     if (toolResults.length > 0) {
       messages.push({
         role: 'user',
@@ -131,6 +171,8 @@ async function useComputer(
       break;
     }
   }
+
+  // Clean up and log completion
   computer.close();
   logger.info({ task }, 'Completed task: ');
 }

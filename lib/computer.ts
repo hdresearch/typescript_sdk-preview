@@ -6,11 +6,7 @@ import {
   type ToolI,
 } from './types';
 
-import {
-  bashTool,
-  computerTool,
-  // editTool
-} from './tools';
+import { bashTool, computerTool } from './tools';
 import { ComputerLogger } from './utils/computerLogger';
 import { createModuleLogger } from './utils/logger';
 import { EventEmitter } from 'events';
