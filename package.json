@@ -7,6 +7,7 @@
     "dist"
   ],
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.33.1",
     "dotenv": "^16.4.7",
     "husky": "^9.1.7",
     "lint-staged": "^15.2.10",
