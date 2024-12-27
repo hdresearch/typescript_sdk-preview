@@ -1,3 +1,4 @@
+// anthropic generative loop for computer use
 import Anthropic from '@anthropic-ai/sdk';
 import type {
   BetaContentBlock,
@@ -12,16 +13,11 @@ import { Action } from '../lib/schemas/action';
 import {
   defaultSamplingOptions,
   type DefaultSamplingOptions,
-} from './quickstart_utils/types';
+} from '../lib/types';
 import { logger } from '../lib/utils/logger';
-import { makeToolResult } from './quickstart_utils/utils';
+import { makeToolResult } from './tools';
 import { ToolResult } from '../lib/types';
 
-const BASE_URL = 'wss://api.hdr.is/compute/ephemeral';
-
-// This is the base system prompt
-// This prompt assumes you have all tools enabled.
-// If you want to use a subset of tools, you can modify this prompt to include only the tools you want to use.
 function systemCapability(computer: Computer) {
   return `<SYSTEM_CAPABILITY>
 * You are utilising an Ubuntu virtual machine using ${computer.machineMetadata?.arch} architecture with internet access.
@@ -51,10 +47,10 @@ function systemCapability(computer: Computer) {
  * @param computer - Instance of Computer class for executing commands
  * @param options - Optional sampling parameters for Claude (model, tokens etc)
  */
-async function useComputer(
+export async function useComputer(
   task: string,
   computer: Computer,
-  options: Partial<DefaultSamplingOptions>
+  options?: Partial<DefaultSamplingOptions>
 ) {
   // Merge provided options with defaults
   const samplingOptions = { ...defaultSamplingOptions, ...options };
@@ -173,24 +169,5 @@ async function useComputer(
   }
 
   // Clean up and log completion
-  computer.close();
   logger.info({ task }, 'Completed task: ');
 }
-
-async function main() {
-  const computer = new Computer({ baseUrl: BASE_URL });
-  await computer.connect();
-
-  // Here are some additional prompts you can run
-  // Move your mouse to the center of the screen and the confirm.
-  // Please use cowsay to say hello'
-  // Open firefox
-  await useComputer(
-    'Navigate to https://hdr.is to and get a feel for the aesthetics of the site. Write me a python webserver that creates a static webpage that displays "Hello world!" in a similar style, run the server, and then open the webpage in firefox',
-    computer,
-    {}
-  );
-  await computer.close();
-}
-
-main();

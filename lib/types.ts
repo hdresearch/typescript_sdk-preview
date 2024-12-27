@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import 'dotenv/config';
+import type { BetaMessageParam } from '@anthropic-ai/sdk/resources/beta/index.mjs';
 
 /**
  * Configuration for connecting to the HDR API
@@ -73,3 +74,19 @@ export interface ToolI {
   display_height_px?: number;
   display_width_px?: number;
 }
+
+export interface DefaultSamplingOptions {
+  model: string;
+  max_tokens: number;
+  system: string;
+  messages: BetaMessageParam[];
+  temperature: number;
+}
+
+export const defaultSamplingOptions: DefaultSamplingOptions = {
+  model: 'claude-3-5-sonnet-20241022',
+  max_tokens: 4096,
+  temperature: 0,
+  system: '',
+  messages: [],
+};

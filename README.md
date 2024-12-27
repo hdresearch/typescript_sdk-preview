@@ -18,16 +18,16 @@ A TypeScript library for programmatic control of remote computers via WebSocket 
 ## Installation
 
 ```bash
-npm install @your-org/computer-control
+npm install @hdr/sdk-preview
 ```
 
 ## Quick Start
 
 ```typescript
-import { Computer } from '@your-org/computer-control';
+import { Computer } from '@hdr/sdk-preview';
 
 // Initialize a new computer connection
-const computer = new Computer('wss://api.hdr.is/compute/ws', 'your-api-key');
+const computer = new Computer();
 
 // Connect to the remote computer
 await computer.connect();
@@ -150,14 +150,15 @@ try {
 ## Environment Variables
 
 - `HDR_API_KEY`: Your API key for authentication
-- `LOG_LEVEL`: Logging level (default: 'info')
+- `ANTHROPIC_API_KEY`: optional Anthropic key for high-level objective-oriented computer use
+- `HDR_BASE_URL`: optional URL for computer use socket
 
 ## Development
 
 ### Prerequisites
 
-- Node.js 14+
-- TypeScript 4.5+
+- Node.js 20+
+- TypeScript 5.7+
 - WebSocket-compatible environment
 
 ### Building
@@ -172,11 +173,3 @@ bun run build
 ```bash
 bun test
 ```
-
-## License
-
-[Add your license information here]
-
-## Contributing
-
-[Add contribution guidelines here]

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'bun:test';
 import { Computer } from '../lib/computer';
-import { bashTool, editTool } from '../lib/tools';
+import { bashTool } from '../lib/tools';
 import { computerTool } from '../lib/tools';
 
 describe('Computer Tests', () => {
@@ -20,7 +20,7 @@ describe('Computer Tests', () => {
   it('should handle connection message', async () => {
     expect(computer.sessionId).toBeDefined();
     expect(computer.machineMetadata).toBeDefined();
-    expect(computer.listTools()).toEqual([bashTool, computerTool, editTool]);
+    expect(computer.listTools()).toEqual([bashTool, computerTool]);
   });
 
   it('should handle send message', async () => {
@@ -59,25 +59,25 @@ describe('Computer Tests', () => {
     expect(cursor_position.tool_result.output).toBe('X=100,Y=100');
   });
 
-  it('should edit a file', async () => {
-    await computer.execute({
-      tool: 'str_replace_editor',
-      params: {
-        command: 'create',
-        path: '/tmp/test.txt',
-        file_text: 'Hello world!',
-      },
-    });
+  // it('should edit a file', async () => {
+  //   await computer.execute({
+  //     tool: 'str_replace_editor',
+  //     params: {
+  //       command: 'create',
+  //       path: '/tmp/test.txt',
+  //       file_text: 'Hello world!',
+  //     },
+  //   });
 
-    const message = await computer.execute({
-      tool: 'str_replace_editor',
-      params: {
-        command: 'view',
-        path: '/tmp/test.txt',
-      },
-    });
-    expect(message.tool_result.output).toBe('Hello world!');
-  });
+  //   const message = await computer.execute({
+  //     tool: 'str_replace_editor',
+  //     params: {
+  //       command: 'view',
+  //       path: '/tmp/test.txt',
+  //     },
+  //   });
+  //   expect(message.tool_result.output).toBe('Hello world!');
+  // });
 
   afterAll(async () => {
     await computer.close();

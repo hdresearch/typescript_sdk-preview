@@ -11,67 +11,52 @@ import { ComputerLogger } from './utils/computerLogger';
 import { createModuleLogger } from './utils/logger';
 import { EventEmitter } from 'events';
 import { Action } from './schemas/action';
+import { useComputer } from './anthropic';
 
 const logger = createModuleLogger('Computer');
 
 /**
- * Interface defining the core functionality for computer control
+ * Interface defining the core functionality for computer control operations
  */
 export interface IComputer {
-  /**
-   * Establishes a WebSocket connection to the computer
-   * @throws Error if connection fails or times out
-   */
+  /** Establishes a WebSocket connection to the computer control server */
   connect(): Promise<void>;
-
-  /**
-   * Executes a command on the connected computer
-   * @param command The action to execute (bash command or computer control action)
-   * @returns A promise that resolves with the computer's response message
-   * @throws Error if not connected or command execution fails
-   */
+  /** Executes a specified command action on the connected computer */
   execute(command: Action): Promise<ComputerMessage>;
-
-  /**
-   * Checks if there is an active WebSocket connection to the computer
-   * @returns true if WebSocket connection is open, false otherwise
-   */
+  /** Checks if the WebSocket connection is currently active */
   isConnected(): boolean;
 }
 
 /**
- * Configuration options for customizing Computer behavior
+ * Configuration options for the Computer instance
  */
 export interface ComputerOptions {
-  /** Base URL for the WebSocket connection */
+  /** Base WebSocket URL for the server */
   baseUrl?: string;
-  /** API key for authentication */
+  /** HDR API key for authentication */
   apiKey?: string;
-  /** Tools available to the computer */
+  /** Set of available tools for computer control */
   tools?: Set<ToolI>;
-  /** Handler for processing incoming messages */
+  /** Callback function for handling incoming messages */
   onMessage: (message: ComputerMessage) => void | Promise<void>;
-  /** Handler for parsing raw WebSocket messages */
+  /** Function to parse incoming WebSocket messages */
   parseMessage: (message: MessageEvent) => void | ComputerMessage;
-  /** Optional handler called when connection is established */
+  /** Callback function triggered when connection is established */
   onOpen?: () => void | Promise<void>;
-  /** Optional handler for connection errors */
+  /** Error handling callback */
   onError?: (error: Error) => void;
-  /** Optional handler for connection close events */
+  /** Callback function for connection closure */
   onClose?: (code: number, reason: string) => void;
-  /** Optional transform function for outgoing messages */
+  /** Pre-processing function for outgoing data */
   beforeSend?: (data: unknown) => unknown;
 }
 
 /**
- * Default configuration options for Computer instances
+ * Default configuration options for the Computer instance
  */
 const defaultOptions: ComputerOptions = {
-  tools: new Set([
-    bashTool,
-    computerTool,
-    // editTool
-  ]),
+  baseUrl: process.env.HDR_BASE_URL || 'wss://api.hdr.is/compute/ephemeral',
+  tools: new Set([bashTool, computerTool]),
   onOpen: () => {},
   onMessage: () => {},
   onError: () => {},
@@ -82,35 +67,24 @@ const defaultOptions: ComputerOptions = {
 };
 
 /**
- * Main class for establishing connections and controlling a remote computer
- * Implements EventEmitter pattern for WebSocket event handling
+ * Main class for managing computer control operations through WebSocket
+ * @extends EventEmitter
+ * @implements IComputer
  */
 export class Computer extends EventEmitter implements IComputer {
-  /** Configuration settings for the computer connection */
   private config: HDRConfig;
-  /** Options for customizing behavior */
   private options: ComputerOptions;
-  /** WebSocket connection instance */
   private ws: WebSocket | null = null;
-  /** Logger instance for this computer */
   private logger: ComputerLogger;
-
-  /** ISO timestamp when instance was created */
   createdAt: string;
-  /** ISO timestamp of last received message */
   updatedAt: string | null = null;
-  /** Unique identifier for current session */
   sessionId: string | null = null;
-  /** Connected computer's hostname */
   machineMetadata: MachineMetadata | null = null;
-  /** Tools available to the computer */
   tools: Set<ToolI> = new Set();
 
   /**
    * Creates a new Computer instance
-   * @param baseUrl WebSocket server URL
-   * @param apiKey Authentication API key
-   * @param options Configuration options
+   * @param {Partial<ComputerOptions>} options - Configuration options for the computer control interface
    */
   constructor(options: Partial<ComputerOptions> = {}) {
     super();
@@ -137,21 +111,27 @@ export class Computer extends EventEmitter implements IComputer {
   }
 
   /**
-   * Handles WebSocket open events
+   * Handles WebSocket open event
    * @private
    */
   private onOpen() {
     this.options.onOpen?.();
   }
 
+  /**
+   * Parses incoming WebSocket messages
+   * @param {MessageEvent} message - Raw WebSocket message
+   * @returns {ComputerMessage} Parsed message object
+   * @private
+   */
   private parseMessage(message: MessageEvent): ComputerMessage {
     this.options.parseMessage(message);
     return ComputerMessage.parse(JSON.parse(message.toString()));
   }
 
   /**
-   * Handles incoming WebSocket messages
-   * @param message The raw message event from WebSocket
+   * Processes incoming WebSocket messages
+   * @param {MessageEvent} message - WebSocket message event
    * @private
    */
   private onMessage(message: MessageEvent) {
@@ -164,7 +144,7 @@ export class Computer extends EventEmitter implements IComputer {
 
   /**
    * Handles WebSocket error events
-   * @param error The error that occurred
+   * @param {Error} error - Error object
    * @private
    */
   private onError(error: Error) {
@@ -174,8 +154,8 @@ export class Computer extends EventEmitter implements IComputer {
 
   /**
    * Handles WebSocket close events
-   * @param code The close code
-   * @param reason The reason for closing
+   * @param {number} code - Close status code
+   * @param {string} reason - Close reason
    * @private
    */
   private onClose(code: number, reason: string) {
@@ -184,8 +164,8 @@ export class Computer extends EventEmitter implements IComputer {
   }
 
   /**
-   * Processes connection-related messages and updates session info
-   * @param message The parsed computer message
+   * Processes connection-related messages and updates machine metadata
+   * @param {ComputerMessage} message - Parsed computer message
    * @private
    */
   private handleConnectionMessage(message: ComputerMessage) {
@@ -196,23 +176,20 @@ export class Computer extends EventEmitter implements IComputer {
       this.machineMetadata = machineMetadata;
       this.sessionId = message.metadata.session_id;
 
-      // Update computer tool with actual display dimensions
       const updatedComputerTool = {
         ...computerTool,
         display_height_px: machineMetadata.display_height ?? 0,
         display_width_px: machineMetadata.display_width ?? 0,
       };
 
-      // Replace the existing computer tool with updated version
       this.options.tools?.delete(computerTool);
       this.options.tools?.add(updatedComputerTool);
     }
   }
 
   /**
-   * Establishes a WebSocket connection to the computer
-   * @returns Promise that resolves when connection is established
-   * @throws Error if connection fails
+   * Establishes WebSocket connection
+   * @returns {Promise<void>}
    */
   public async connect(): Promise<void> {
     return new Promise((resolve, reject) => {
@@ -242,9 +219,10 @@ export class Computer extends EventEmitter implements IComputer {
   }
 
   /**
-   * Sends raw data through the WebSocket connection
-   * @param data Data to send (will be JSON stringified if not a string)
-   * @throws Error if not connected
+   * Sends data through WebSocket connection
+   * @param {Action} data - Action to be sent
+   * @returns {Promise<void>}
+   * @private
    */
   private async send(data: Action): Promise<void> {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
@@ -260,10 +238,9 @@ export class Computer extends EventEmitter implements IComputer {
   }
 
   /**
-   * Executes a command on the connected computer
-   * This method will connect to a computer if not already connected
-   * @param command The action to execute
-   * @returns Promise resolving to the computer's response
+   * Executes a command and waits for response
+   * @param {Action} command - Command to execute
+   * @returns {Promise<ComputerMessage>} Response message
    */
   public async execute(command: Action): Promise<ComputerMessage> {
     await this.ensureConnected();
@@ -282,8 +259,26 @@ export class Computer extends EventEmitter implements IComputer {
   }
 
   /**
-   * Updates the timestamp of last received message
-   * @param timestamp Unix timestamp in milliseconds
+   * Executes a high-level objective using specified provider
+   * @param {string} objective - Description of the task to perform
+   * @param {'anthropic' | 'custom'} provider - Provider to use for execution
+   * @returns {Promise<void>}
+   */
+  public async do(
+    objective: string,
+    provider: 'anthropic' | 'custom' = 'anthropic'
+  ): Promise<void> {
+    if (provider === 'custom') {
+      throw new Error(
+        'Custom providers are not supported for this method. Use the execute method instead.'
+      );
+    }
+    await useComputer(objective, this);
+  }
+
+  /**
+   * Updates the last activity timestamp
+   * @param {number} timestamp - Unix timestamp
    * @private
    */
   private setUpdatedAt(timestamp: number) {
@@ -291,7 +286,7 @@ export class Computer extends EventEmitter implements IComputer {
   }
 
   /**
-   * Ensures there is an active connection, connecting if necessary
+   * Ensures WebSocket connection is established
    * @private
    */
   private async ensureConnected() {
@@ -301,15 +296,16 @@ export class Computer extends EventEmitter implements IComputer {
   }
 
   /**
-   * Checks if there is an active WebSocket connection
-   * @returns true if connected, false otherwise
+   * Checks if WebSocket connection is active
+   * @returns {boolean} Connection status
    */
   public isConnected(): boolean {
     return this.ws?.readyState === WebSocket.OPEN;
   }
 
   /**
-   * Closes the WebSocket connection if open
+   * Closes the WebSocket connection
+   * @returns {Promise<void>}
    */
   public async close() {
     this.ws?.close();
@@ -317,9 +313,8 @@ export class Computer extends EventEmitter implements IComputer {
   }
 
   /**
-   * Takes a screenshot of the connected computer's display
-   * @returns Promise resolving to base64 encoded PNG image data
-   * @throws Error if screenshot capture fails
+   * Takes a screenshot of the connected computer
+   * @returns {Promise<string>} Base64 encoded screenshot
    */
   public async screenshot(): Promise<string> {
     const message = await this.execute({
@@ -333,12 +328,20 @@ export class Computer extends EventEmitter implements IComputer {
     return message.tool_result.base64_image;
   }
 
+  /**
+   * Registers new tools for computer control
+   * @param {ToolI[]} tools - Array of tools to register
+   */
   public registerTool(tools: ToolI[]) {
     tools.forEach((tool) => {
       this.options.tools?.add(tool);
     });
   }
 
+  /**
+   * Lists all registered tools
+   * @returns {ToolI[]} Array of registered tools
+   */
   public listTools(): ToolI[] {
     return Array.from(this.options.tools ?? new Set());
   }
