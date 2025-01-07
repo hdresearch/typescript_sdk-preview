@@ -1,21 +1,24 @@
 import { describe, beforeAll, afterAll, it, expect } from 'bun:test';
-import { Computer } from "../lib/computer";
+import { Computer } from '../lib/computer';
 import { ComputerMessage } from '../lib/types';
 import { join } from 'path';
 import os from 'os';
 import fs from 'fs/promises';
 
 const FILEPATH = join(os.tmpdir(), 'hdr_typescript_sdk_test.txt');
-const FILEPATH_FAKE = join(os.tmpdir(), 'hdr_typescript_sdk_does_not_exist.txt');
+const FILEPATH_FAKE = join(
+  os.tmpdir(),
+  'hdr_typescript_sdk_does_not_exist.txt'
+);
 
 describe('Edit tests', () => {
   let computer: Computer;
-  
+
   beforeAll(async () => {
     await cleanTempFiles();
 
     const baseUrl = process.env.TEST_BASE_URL;
-    
+
     computer = new Computer({ baseUrl });
     try {
       await computer.connect();
@@ -23,26 +26,27 @@ describe('Edit tests', () => {
       throw new Error(`failed to connect to computer at ${baseUrl}`);
     }
   });
-  
+
   afterAll(async () => {
     await cleanTempFiles();
-  })
-  
+  });
+
   it('should be able to create and manipulate a file', async () => {
     let toolResult: ComputerMessage;
-    
+
     // Try to create file
     toolResult = await computer.execute({
       tool: 'str_replace_editor',
       params: {
         path: FILEPATH,
         command: 'create',
-        file_text: 'This file was created by Husdon by HDR Research! If you found this file, then something went wrong, because it is supposed to be deleted.'
-      }
+        file_text:
+          'This file was created by Husdon by HDR Research! If you found this file, then something went wrong, because it is supposed to be deleted.',
+      },
     });
     expect(toolResult.tool_result.error).toBeNull();
     expect(toolResult.tool_result.output).toBeString();
-    
+
     // Try to replace typo
     toolResult = await computer.execute({
       tool: 'str_replace_editor',
@@ -50,43 +54,44 @@ describe('Edit tests', () => {
         path: FILEPATH,
         command: 'str_replace',
         old_str: 'Husdon',
-        new_str: 'Hudson'
-      }
+        new_str: 'Hudson',
+      },
     });
     expect(toolResult.tool_result.error).toBeNull();
     expect(toolResult.tool_result.output).toBeString();
-    
+
     // Try to insert a new line at the end
     toolResult = await computer.execute({
       tool: 'str_replace_editor',
       params: {
         path: FILEPATH,
         command: 'insert',
-        new_str: 'If you found this line, then the test must have failed, because it is supposed to be DELETED.',
-        insert_line: 1
-      }
+        new_str:
+          'If you found this line, then the test must have failed, because it is supposed to be DELETED.',
+        insert_line: 1,
+      },
     });
     expect(toolResult.tool_result.error).toBeNull();
     expect(toolResult.tool_result.output).toBeString();
-    
+
     // Try to undo the new line
     toolResult = await computer.execute({
       tool: 'str_replace_editor',
       params: {
         path: FILEPATH,
         command: 'undo_edit',
-      }
+      },
     });
     expect(toolResult.tool_result.error).toBeNull();
     expect(toolResult.tool_result.output).toBeString();
-    
+
     // Try to view the file
     toolResult = await computer.execute({
       tool: 'str_replace_editor',
       params: {
         path: FILEPATH,
-        command: 'view'
-      }
+        command: 'view',
+      },
     });
     const output = toolResult.tool_result.output;
     expect(output).not.toContain('Husdon');
@@ -94,22 +99,22 @@ describe('Edit tests', () => {
     expect(output).toContain('deleted');
     expect(output).not.toContain('DELETED');
   });
-  
+
   it('should fail on trying to manipulate a non-existent file', async () => {
     let toolResult: ComputerMessage;
-    
+
     // Try to create in non-existent directory
     toolResult = await computer.execute({
       tool: 'str_replace_editor',
       params: {
         path: join(os.tmpdir(), 'clearly_fake_dir', 'test.txt'),
         command: 'create',
-        file_text: 'This should fail'
-      }
+        file_text: 'This should fail',
+      },
     });
     expect(toolResult.tool_result.output).toBeNull();
     expect(toolResult.tool_result.error).toBeString();
-    
+
     // Try to replace string in non-existent file
     toolResult = await computer.execute({
       tool: 'str_replace_editor',
@@ -117,34 +122,34 @@ describe('Edit tests', () => {
         path: FILEPATH_FAKE,
         command: 'str_replace',
         old_str: 'test',
-        new_str: 'replacement'
-      }
+        new_str: 'replacement',
+      },
     });
     expect(toolResult.tool_result.output).toBeNull();
     expect(toolResult.tool_result.error).toBeString();
-    
-    // Try to insert into non-existent file 
+
+    // Try to insert into non-existent file
     toolResult = await computer.execute({
       tool: 'str_replace_editor',
       params: {
         path: FILEPATH_FAKE,
         command: 'insert',
         new_str: 'test line',
-        insert_line: 1
-      }
+        insert_line: 1,
+      },
     });
     expect(toolResult.tool_result.output).toBeNull();
     expect(toolResult.tool_result.error).toBeString();
-    
+
     // Try to undo edit on non-existent file
     // Note that if previous tests fail (and do create a file), the Hudson instance can be "poisoned" with its undo history and may have to be restarted before this test will succeed.
-    console.log("=== undo_edit ===");
+    console.log('=== undo_edit ===');
     toolResult = await computer.execute({
       tool: 'str_replace_editor',
       params: {
         path: FILEPATH_FAKE,
-        command: 'undo_edit'
-      }
+        command: 'undo_edit',
+      },
     });
     expect(toolResult.tool_result.output).toBeNull();
     expect(toolResult.tool_result.error).toBeString();
@@ -154,8 +159,8 @@ describe('Edit tests', () => {
       tool: 'str_replace_editor',
       params: {
         path: FILEPATH_FAKE,
-        command: 'view'
-      }
+        command: 'view',
+      },
     });
     expect(toolResult.tool_result.output).toBeNull();
     expect(toolResult.tool_result.error).toBeString();
