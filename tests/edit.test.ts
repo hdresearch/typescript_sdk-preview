@@ -41,7 +41,7 @@ describe('Edit tests', () => {
         path: FILEPATH,
         command: 'create',
         file_text:
-          'This file was created by Husdon by HDR Research! If you found this file, then something went wrong, because it is supposed to be deleted.',
+          'This file was created by the TypeScirpt SDK by HDR Research! If you found this file, then something went wrong, because it is supposed to be deleted.',
       },
     });
     expect(toolResult.tool_result.error).toBeNull();
@@ -53,8 +53,8 @@ describe('Edit tests', () => {
       params: {
         path: FILEPATH,
         command: 'str_replace',
-        old_str: 'Husdon',
-        new_str: 'Hudson',
+        old_str: 'TypeScirpt',
+        new_str: 'TypeScript',
       },
     });
     expect(toolResult.tool_result.error).toBeNull();
@@ -94,8 +94,8 @@ describe('Edit tests', () => {
       },
     });
     const output = toolResult.tool_result.output;
-    expect(output).not.toContain('Husdon');
-    expect(output).toContain('Hudson');
+    expect(output).not.toContain('TypeScirpt');
+    expect(output).toContain('TypeScript');
     expect(output).toContain('deleted');
     expect(output).not.toContain('DELETED');
   });
