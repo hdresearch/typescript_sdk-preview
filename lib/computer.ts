@@ -455,7 +455,7 @@ export class Computer extends EventEmitter implements IComputer {
     return { serverInfo, error };
   }
 
-  async callMcpTool(
+  public async callMcpTool(
     name: string,
     args?: Record<string, unknown>,
     resultSchema?:
@@ -463,7 +463,10 @@ export class Computer extends EventEmitter implements IComputer {
       | typeof CompatibilityCallToolResultSchema,
     options?: RequestOptions
   ) {
-    if (!this.mcpClient) throw new Error('MCP Client not connected; have you called Computer.connect()?');
+    if (!this.mcpClient)
+      throw new Error(
+        'MCP Client not connected; have you called Computer.connect()?'
+      );
     const params: CallToolRequest['params'] = {
       name,
       arguments: args,
@@ -475,8 +478,11 @@ export class Computer extends EventEmitter implements IComputer {
   /**
    * @returns a list of tools exposed by all currently-running MCP servers
    */
-  async listMcpTools(): Promise<BetaTool[]> {
-    if (!this.mcpClient) throw new Error('MCP Client not connected; have you called Computer.connect()?');
+  public async listMcpTools(): Promise<BetaTool[]> {
+    if (!this.mcpClient)
+      throw new Error(
+        'MCP Client not connected; have you called Computer.connect()?'
+      );
     return this.mcpClient.listTools().then((x) =>
       x.tools.map((tool) => {
         const betaTool: BetaTool = {
@@ -488,25 +494,34 @@ export class Computer extends EventEmitter implements IComputer {
     );
   }
 
-  async getMcpServerCapabilities(): Promise<ServerCapabilities | undefined> {
-    if (!this.mcpClient) throw new Error('MCP Client not connected; have you called Computer.connect()?');
+  public async getMcpServerCapabilities(): Promise<ServerCapabilities | undefined> {
+    if (!this.mcpClient)
+      throw new Error(
+        'MCP Client not connected; have you called Computer.connect()?'
+      );
     return this.mcpClient.getServerCapabilities();
   }
 
-  async getMcpServerVersion(): Promise<Implementation | undefined> {
-    if (!this.mcpClient) throw new Error('MCP Client not connected; have you called Computer.connect()?');
+  public async getMcpServerVersion(): Promise<Implementation | undefined> {
+    if (!this.mcpClient)
+      throw new Error(
+        'MCP Client not connected; have you called Computer.connect()?'
+      );
     return this.mcpClient.getServerVersion();
   }
 
-  async mcpPing() {
-    if (!this.mcpClient) throw new Error('MCP Client not connected; have you called Computer.connect()?');
+  public async mcpPing() {
+    if (!this.mcpClient)
+      throw new Error(
+        'MCP Client not connected; have you called Computer.connect()?'
+      );
     return this.mcpClient.ping();
   }
 
   /**
    * @returns a list of all tools, both computer use and MCP.
    */
-  async listAllTools(): Promise<BetaToolUnion[]> {
+  public async listAllTools(): Promise<BetaToolUnion[]> {
     return [...this.listComputerUseTools(), ...(await this.listMcpTools())];
   }
 }
