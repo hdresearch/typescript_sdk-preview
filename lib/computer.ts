@@ -27,15 +27,15 @@ import type {
   ServerCapabilities,
 } from '@modelcontextprotocol/sdk/types.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
-
-// TODO: Polyfill is a workaround required by MCP SDK  - asebexen
-// Solution taken from https://github.com/pocketbase/pocketbase/discussions/3285
-import { EventSource } from 'eventsource';
 import type { RequestOptions } from '@modelcontextprotocol/sdk/shared/protocol.js';
 import type {
   BetaToolUnion,
   BetaTool,
 } from '@anthropic-ai/sdk/resources/beta/index.mjs';
+
+// Polyfill is a workaround required by MCP SDK  - asebexen
+// Solution taken from https://github.com/pocketbase/pocketbase/discussions/3285
+import { EventSource } from 'eventsource';
 global.EventSource = EventSource;
 
 const logger = createModuleLogger('Computer');
