@@ -455,7 +455,9 @@ export class Computer extends EventEmitter implements IComputer {
   async callMcpTool(
     name: string,
     args?: Record<string, unknown>,
-    resultSchema?: typeof CallToolResultSchema | typeof CompatibilityCallToolResultSchema,
+    resultSchema?:
+      | typeof CallToolResultSchema
+      | typeof CompatibilityCallToolResultSchema,
     options?: RequestOptions
   ) {
     if (!this.mcpClient) throw new Error('MCP Client not initialized');
