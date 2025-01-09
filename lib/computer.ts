@@ -12,6 +12,18 @@ import { createModuleLogger } from './utils/logger';
 import { EventEmitter } from 'events';
 import { Action } from './schemas/action';
 import { useComputer } from './anthropic';
+import {
+  Client,
+  type ClientOptions,
+} from '@modelcontextprotocol/sdk/client/index.js';
+import { VERSION, MCP_CLIENT_NAME } from './constants';
+import type { Implementation } from '@modelcontextprotocol/sdk/types.js';
+import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
+
+// TODO: Polyfill is a workaround required by MCP SDK  - asebexen
+// Solution taken from https://github.com/pocketbase/pocketbase/discussions/3285
+import { EventSource } from 'eventsource';
+global.EventSource = EventSource;
 
 const logger = createModuleLogger('Computer');
 
@@ -20,7 +32,7 @@ const logger = createModuleLogger('Computer');
  */
 export interface IComputer {
   /** Establishes a WebSocket connection to the computer control server */
-  connect(): Promise<void>;
+  connect(): Promise<void[]>;
   /** Executes a specified command action on the connected computer */
   execute(command: Action): Promise<ComputerMessage>;
   /** Checks if the WebSocket connection is currently active */
@@ -31,8 +43,10 @@ export interface IComputer {
  * Configuration options for the Computer instance
  */
 export interface ComputerOptions {
-  /** Base WebSocket URL for the server */
-  baseUrl?: string;
+  /** Hudson Server WebSocket URL */
+  wsUrl?: string;
+  /** Hudson Server MCP URL */
+  mcpUrl?: string;
   /** HDR API key for authentication */
   apiKey?: string;
   /** Set of available tools for computer control */
@@ -55,7 +69,8 @@ export interface ComputerOptions {
  * Default configuration options for the Computer instance
  */
 const defaultOptions: ComputerOptions = {
-  baseUrl: process.env.HDR_BASE_URL || 'wss://api.hdr.is/compute/ephemeral',
+  wsUrl: process.env.HDR_WS_URL || 'wss://api.hdr.is/compute/ephemeral',
+  mcpUrl: process.env.HDR_MCP_URL || '',
   tools: new Set([bashTool, computerTool]),
   onOpen: () => {},
   onMessage: () => {},
@@ -67,7 +82,15 @@ const defaultOptions: ComputerOptions = {
 };
 
 /**
- * Main class for managing computer control operations through WebSocket
+ * Metadata for the MCP client
+ */
+const mcpClientInfo: Implementation = {
+  name: MCP_CLIENT_NAME,
+  version: VERSION,
+};
+
+/**
+ * Main class for managing computer control operations through WebSocket, as well as MCP operations
  * @extends EventEmitter
  * @implements IComputer
  */
@@ -75,6 +98,7 @@ export class Computer extends EventEmitter implements IComputer {
   private config: HDRConfig;
   private options: ComputerOptions;
   private ws: WebSocket | null = null;
+  private mcpClient: Client | null = null;
   private logger: ComputerLogger;
   createdAt: string;
   updatedAt: string | null = null;
@@ -90,8 +114,9 @@ export class Computer extends EventEmitter implements IComputer {
     super();
     this.options = { ...defaultOptions, ...options };
     this.config = HDRConfig.parse({
-      base_url: options.baseUrl,
-      api_key: options.apiKey,
+      ws_url: this.options.wsUrl,
+      mcp_url: this.options.mcpUrl,
+      api_key: this.options.apiKey,
     });
     this.logger = new ComputerLogger();
     this.createdAt = new Date().toISOString();
@@ -188,12 +213,20 @@ export class Computer extends EventEmitter implements IComputer {
   }
 
   /**
-   * Establishes WebSocket connection
-   * @returns {Promise<void>}
+   * Establishes WebSocket and SSE (MCP) connection
+   * @returns {Promise<void[]>}
    */
-  public async connect(): Promise<void> {
-    return new Promise((resolve, reject) => {
-      this.ws = new WebSocket(this.config.base_url, {
+  public async connect(): Promise<void[]> {
+    return Promise.all([this.connectWS(), this.connectMcpClient()]);
+  }
+
+  /**
+   * Establish WebSocket connection
+   * @private
+   */
+  private async connectWS(): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
+      this.ws = new WebSocket(this.config.ws_url, {
         headers: { Authorization: `Bearer ${this.config.api_key}` },
       });
 
@@ -219,12 +252,32 @@ export class Computer extends EventEmitter implements IComputer {
   }
 
   /**
+   * Establish MCP Client connection
+   * @private
+   */
+  private async connectMcpClient(): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
+      const options: ClientOptions = {
+        capabilities: {},
+      };
+      this.mcpClient = new Client(mcpClientInfo, options);
+      const url = new URL(`${this.config.mcp_url}`);
+      const transport = new SSEClientTransport(url);
+
+      this.mcpClient
+        .connect(transport)
+        .then(resolve)
+        .catch((e) => reject(`MCP client failed to connect: ${e}`));
+    });
+  }
+
+  /**
    * Sends data through WebSocket connection
    * @param {Action} data - Action to be sent
    * @returns {Promise<void>}
    * @private
    */
-  private async send(data: Action): Promise<void> {
+  private async sendWS(data: Action): Promise<void> {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
       throw new Error('WebSocket is not connected');
     }
@@ -254,7 +307,7 @@ export class Computer extends EventEmitter implements IComputer {
       };
 
       this.addListener('message', handleMessage);
-      this.send(command);
+      this.sendWS(command);
     });
   }
 

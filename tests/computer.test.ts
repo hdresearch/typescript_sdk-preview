@@ -7,9 +7,7 @@ describe('Computer Tests', () => {
   let computer: Computer;
 
   beforeAll(async () => {
-    const baseUrl = process.env.TEST_BASE_URL;
-
-    computer = new Computer({ baseUrl });
+    computer = new Computer();
     await computer.connect();
   });
 

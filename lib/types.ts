@@ -5,11 +5,13 @@ import type { BetaMessageParam } from '@anthropic-ai/sdk/resources/beta/index.mj
 /**
  * Configuration for connecting to the HDR API
  * @property api_key - API key for authentication, defaults to HDR_API_KEY env var
- * @property base_url - WebSocket API endpoint, defaults to wss://api.hdr.is
+ * @property ws_url - WebSocket API endpoint, defaults to wss://api.hdr.is
+ * @property mcp - MCP API endpoint
  */
 export const HDRConfig = z.object({
   api_key: z.string().default(process.env.HDR_API_KEY || ''),
-  base_url: z.string().default('wss://api.hdr.is/compute/ephemeral'),
+  ws_url: z.string().default('wss://api.hdr.is/compute/ephemeral'),
+  mcp_url: z.string(),
   log_dir: z.string().default('./computer_logs'),
   log_conversation: z.boolean().default(true),
 });
