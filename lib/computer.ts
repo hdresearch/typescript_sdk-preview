@@ -494,7 +494,9 @@ export class Computer extends EventEmitter implements IComputer {
     );
   }
 
-  public async getMcpServerCapabilities(): Promise<ServerCapabilities | undefined> {
+  public async getMcpServerCapabilities(): Promise<
+    ServerCapabilities | undefined
+  > {
     if (!this.mcpClient)
       throw new Error(
         'MCP Client not connected; have you called Computer.connect()?'
