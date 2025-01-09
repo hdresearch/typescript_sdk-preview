@@ -65,20 +65,69 @@ describe('Computer Tests', () => {
   });
 
   describe('MCP tests (featuring kips)', () => {
-    let serverInfo: StartServerResponse;
+    let serverStarted = false;
 
     beforeAll(async () => {
       const { serverInfo: _serverInfo, error } = await computer.startMcpServer(
         'kips',
         'npx kips serve'
       );
-      if (error || !_serverInfo)
-        throw new Error(`Failed to start MCP server 'kips': ${error}`);
-      serverInfo = _serverInfo;
+      if (error || !_serverInfo) {
+        if (error?.includes('already running')) {
+          console.warn(
+            "MCP server 'kips' is already running on the remote machine."
+          );
+          serverStarted = true;
+        } else {
+          throw new Error(`Failed to start MCP server 'kips': ${error}`);
+        }
+      } else {
+        serverStarted = true;
+      }
     });
 
     it('should start up successfully', () => {
-      expect(serverInfo).toBeDefined();
+      expect(serverStarted).toBeTrue();
+    });
+
+    it('should ping', async () => {
+      await computer.mcpPing();
+    });
+
+    it('should be a Hudson Server', async () => {
+      const implementation = await computer.getMcpServerVersion();
+      expect(implementation?.name).toBe('hudson-server');
+    });
+
+    it('should have tools capabilities', async () => {
+      const capabilities = await computer.getMcpServerCapabilities();
+      expect(capabilities?.tools).toBeDefined();
+    });
+
+    it('should have a query tool', async () => {
+      const tools = await computer.listMcpTools();
+      expect(tools.find((tool) => tool.name === 'kips/query')).toBeDefined();
+    });
+
+    it('should invoke the query tool', async () => {
+      const toolResult = await computer.callMcpTool('kips/query', {
+        sql: 'SELECT 1;',
+      });
+      expect(toolResult.isError).toBeFalse();
+    });
+
+    it('should not invoke a fake tool', async () => {
+      const toolPromise = computer.callMcpTool('kips/fake-tool', {
+        fakeArg: false,
+      });
+      expect(toolPromise).rejects.toThrow();
+    });
+
+    it('should not invoke a tool on a fake server', async () => {
+      const toolPromise = computer.callMcpTool('kups/query', {
+        sql: 'SELECT 1;',
+      });
+      expect(toolPromise).rejects.toThrow();
     });
   });
 

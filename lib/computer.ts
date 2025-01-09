@@ -4,7 +4,6 @@ import {
   HDRConfig,
   MachineMetadata,
   StartServerResponseSchema,
-  type McpServer,
   type StartServerRequest,
   type StartServerResponse,
   type ToolI,
@@ -21,12 +20,19 @@ import {
   type ClientOptions,
 } from '@modelcontextprotocol/sdk/client/index.js';
 import { VERSION, MCP_CLIENT_NAME } from './constants';
-import type { Implementation } from '@modelcontextprotocol/sdk/types.js';
+import type {
+  CallToolRequest,
+  CallToolResultSchema,
+  CompatibilityCallToolResultSchema,
+  Implementation,
+  ServerCapabilities,
+} from '@modelcontextprotocol/sdk/types.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 
 // TODO: Polyfill is a workaround required by MCP SDK  - asebexen
 // Solution taken from https://github.com/pocketbase/pocketbase/discussions/3285
 import { EventSource } from 'eventsource';
+import type { RequestOptions } from '@modelcontextprotocol/sdk/shared/protocol.js';
 global.EventSource = EventSource;
 
 const logger = createModuleLogger('Computer');
@@ -109,7 +115,6 @@ export class Computer extends EventEmitter implements IComputer {
   sessionId: string | null = null;
   machineMetadata: MachineMetadata | null = null;
   tools: Set<ToolI> = new Set();
-  servers: McpServer[] = [];
 
   /**
    * Creates a new Computer instance
@@ -433,7 +438,7 @@ export class Computer extends EventEmitter implements IComputer {
     if (!response.ok)
       return {
         serverInfo: null,
-        error: `${response.status} ${response.statusText}`,
+        error: `${response.status} ${response.statusText}: ${await response.text()}`,
       };
 
     const [serverInfo, error] = await (async () => {
@@ -444,13 +449,41 @@ export class Computer extends EventEmitter implements IComputer {
       }
     })();
 
-    if (serverInfo) {
-      this.servers.push({
-        name,
-        tools: serverInfo.tools,
-      });
-    }
-
     return { serverInfo, error };
+  }
+
+  async callMcpTool(
+    name: string,
+    args?: Record<string, unknown>,
+    resultSchema?: typeof CallToolResultSchema | typeof CompatibilityCallToolResultSchema,
+    options?: RequestOptions
+  ) {
+    if (!this.mcpClient) throw new Error('MCP Client not initialized');
+    const params: CallToolRequest['params'] = {
+      name,
+      arguments: args,
+    };
+
+    return this.mcpClient.callTool(params, resultSchema, options);
+  }
+
+  async listMcpTools() {
+    if (!this.mcpClient) throw new Error('MCP Client not initialized');
+    return this.mcpClient.listTools().then((x) => x.tools);
+  }
+
+  async getMcpServerCapabilities(): Promise<ServerCapabilities | undefined> {
+    if (!this.mcpClient) throw new Error('MCP Client not initialized');
+    return this.mcpClient.getServerCapabilities();
+  }
+
+  async getMcpServerVersion(): Promise<Implementation | undefined> {
+    if (!this.mcpClient) throw new Error('MCP Client not initialized');
+    return this.mcpClient.getServerVersion();
+  }
+
+  async mcpPing() {
+    if (!this.mcpClient) throw new Error('MCP Client not initialized');
+    return this.mcpClient.ping();
   }
 }
