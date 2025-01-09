@@ -3,6 +3,10 @@ import {
   ComputerMessage,
   HDRConfig,
   MachineMetadata,
+  StartServerResponseSchema,
+  type McpServer,
+  type StartServerRequest,
+  type StartServerResponse,
   type ToolI,
 } from './types';
 
@@ -105,6 +109,7 @@ export class Computer extends EventEmitter implements IComputer {
   sessionId: string | null = null;
   machineMetadata: MachineMetadata | null = null;
   tools: Set<ToolI> = new Set();
+  servers: McpServer[] = [];
 
   /**
    * Creates a new Computer instance
@@ -397,5 +402,55 @@ export class Computer extends EventEmitter implements IComputer {
    */
   public listTools(): ToolI[] {
     return Array.from(this.options.tools ?? new Set());
+  }
+
+  /**
+   * Starts an MCP server by invoking the supplied shell command
+   */
+  public async startMcpServer(
+    name: string,
+    command: string
+  ): Promise<{
+    serverInfo: StartServerResponse | null;
+    error: string | null;
+  }> {
+    // TODO: Magic string
+    const url = `${this.config.mcp_url}/register_server`;
+
+    const request: StartServerRequest = {
+      name,
+      command,
+    };
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(request),
+    });
+
+    if (!response.ok)
+      return {
+        serverInfo: null,
+        error: `${response.status} ${response.statusText}`,
+      };
+
+    const [serverInfo, error] = await (async () => {
+      try {
+        return [StartServerResponseSchema.parse(await response.json()), null];
+      } catch (e) {
+        return [null, `${e}`];
+      }
+    })();
+
+    if (serverInfo) {
+      this.servers.push({
+        name,
+        tools: serverInfo.tools,
+      });
+    }
+
+    return { serverInfo, error };
   }
 }

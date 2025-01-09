@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import 'dotenv/config';
 import type { BetaMessageParam } from '@anthropic-ai/sdk/resources/beta/index.mjs';
+import { ToolSchema, type Tool } from '@modelcontextprotocol/sdk/types.js';
 
 /**
  * Configuration for connecting to the HDR API
@@ -92,3 +93,31 @@ export const defaultSamplingOptions: DefaultSamplingOptions = {
   system: '',
   messages: [],
 };
+
+/**
+ * Contains information required by Hudson to spawn a new MCP server.
+ * @property command - The shell command Hudson will run to spawn the server (such as `npx` or `uvx`)
+ */
+export interface StartServerRequest {
+  name: string;
+  command: string;
+}
+
+/**
+ * The response returned by Hudson when a server is successfully registered.
+ */
+export const StartServerResponseSchema = z.object({
+  tools: z.array(ToolSchema),
+});
+/**
+ * The response returned by Hudson when a server is successfully registered.
+ */
+export type StartServerResponse = z.infer<typeof StartServerResponseSchema>;
+
+/**
+ * Represents an MCP server currently running on Hudson.
+ */
+export interface McpServer {
+  name: string;
+  tools: Tool[];
+}
