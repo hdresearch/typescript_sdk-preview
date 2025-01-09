@@ -106,7 +106,13 @@ describe('Computer Tests', () => {
 
     it('should have a query tool', async () => {
       const tools = await computer.listMcpTools();
-      expect(tools.find((tool) => tool.name === 'kips/query')).toBeDefined();
+      expect(tools.find(tool => tool.name === 'kips/query')).toBeDefined();
+    });
+
+    it('should list both computer use and mcp tools', async () => {
+      const tools = await computer.listAllTools();
+      expect(tools.find(tool => tool.name === 'kips/update')).toBeDefined();
+      expect(tools.find(tool => tool.name === 'computer' && tool.type === 'computer_20241022')).toBeDefined();
     });
 
     it('should invoke the query tool', async () => {
