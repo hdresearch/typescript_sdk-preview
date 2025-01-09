@@ -6,7 +6,6 @@ import type {
   BetaTextBlockParam,
   BetaToolResultBlockParam,
   BetaToolUseBlock,
-  BetaToolUnion,
 } from '@anthropic-ai/sdk/resources/beta/index.mjs';
 import { Computer } from '../lib';
 import { Action } from '../lib/schemas/action';
@@ -77,7 +76,8 @@ export async function useComputer(
   }
 
   // Log available tools for debugging
-  logger.info({ tools: computer.listTools() }, 'Tools enabled: ');
+  const tools = await computer.listAllTools();
+  logger.info({ tools }, 'Tools enabled: ');
 
   // Main interaction loop
   while (true) {
@@ -87,7 +87,7 @@ export async function useComputer(
       messages: messages,
       system: [systemPrompt],
       max_tokens: samplingOptions.max_tokens,
-      tools: computer.listTools() as BetaToolUnion[],
+      tools: tools,
       betas: ['computer-use-2024-10-22'],
     });
 

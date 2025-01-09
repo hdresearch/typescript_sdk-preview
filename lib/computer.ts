@@ -6,7 +6,6 @@ import {
   StartServerResponseSchema,
   type StartServerRequest,
   type StartServerResponse,
-  type ToolI,
 } from './types';
 
 import { bashTool, computerTool } from './tools';
@@ -33,6 +32,10 @@ import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 // Solution taken from https://github.com/pocketbase/pocketbase/discussions/3285
 import { EventSource } from 'eventsource';
 import type { RequestOptions } from '@modelcontextprotocol/sdk/shared/protocol.js';
+import type {
+  BetaToolUnion,
+  BetaTool,
+} from '@anthropic-ai/sdk/resources/beta/index.mjs';
 global.EventSource = EventSource;
 
 const logger = createModuleLogger('Computer');
@@ -60,7 +63,7 @@ export interface ComputerOptions {
   /** HDR API key for authentication */
   apiKey?: string;
   /** Set of available tools for computer control */
-  tools?: Set<ToolI>;
+  tools?: Set<BetaToolUnion>;
   /** Callback function for handling incoming messages */
   onMessage: (message: ComputerMessage) => void | Promise<void>;
   /** Function to parse incoming WebSocket messages */
@@ -114,7 +117,7 @@ export class Computer extends EventEmitter implements IComputer {
   updatedAt: string | null = null;
   sessionId: string | null = null;
   machineMetadata: MachineMetadata | null = null;
-  tools: Set<ToolI> = new Set();
+  tools: Set<BetaToolUnion> = new Set();
 
   /**
    * Creates a new Computer instance
@@ -393,19 +396,19 @@ export class Computer extends EventEmitter implements IComputer {
 
   /**
    * Registers new tools for computer control
-   * @param {ToolI[]} tools - Array of tools to register
+   * @param {BetaToolUnion[]} tools - Array of tools to register
    */
-  public registerTool(tools: ToolI[]) {
+  public registerTool(tools: BetaToolUnion[]) {
     tools.forEach((tool) => {
       this.options.tools?.add(tool);
     });
   }
 
   /**
-   * Lists all registered tools
-   * @returns {ToolI[]} Array of registered tools
+   * Lists all registered computer use tools
+   * @returns {BetaToolUnion[]} Array of registered computer use tools
    */
-  public listTools(): ToolI[] {
+  public listComputerUseTools(): BetaToolUnion[] {
     return Array.from(this.options.tools ?? new Set());
   }
 
@@ -469,9 +472,20 @@ export class Computer extends EventEmitter implements IComputer {
     return this.mcpClient.callTool(params, resultSchema, options);
   }
 
-  async listMcpTools() {
+  /**
+   * @returns a list of tools exposed by all currently-running MCP servers
+   */
+  async listMcpTools(): Promise<BetaTool[]> {
     if (!this.mcpClient) throw new Error('MCP Client not initialized');
-    return this.mcpClient.listTools().then((x) => x.tools);
+    return this.mcpClient.listTools().then((x) =>
+      x.tools.map((tool) => {
+        const betaTool: BetaTool = {
+          ...tool,
+          input_schema: tool.inputSchema,
+        };
+        return betaTool;
+      })
+    );
   }
 
   async getMcpServerCapabilities(): Promise<ServerCapabilities | undefined> {
@@ -487,5 +501,12 @@ export class Computer extends EventEmitter implements IComputer {
   async mcpPing() {
     if (!this.mcpClient) throw new Error('MCP Client not initialized');
     return this.mcpClient.ping();
+  }
+
+  /**
+   * @returns a list of all tools, both computer use and MCP.
+   */
+  async listAllTools(): Promise<BetaToolUnion[]> {
+    return [...this.listComputerUseTools(), ...(await this.listMcpTools())];
   }
 }

@@ -24,7 +24,7 @@ describe('Computer Tests', () => {
     it('should handle connection message', async () => {
       expect(computer.sessionId).toBeDefined();
       expect(computer.machineMetadata).toBeDefined();
-      expect(computer.listTools()).toEqual([bashTool, computerTool]);
+      expect(computer.listComputerUseTools()).toEqual([bashTool, computerTool]);
     });
 
     it('should handle send message', async () => {
