@@ -59,26 +59,6 @@ describe('Computer Tests', () => {
     expect(cursor_position.tool_result.output).toBe('X=100,Y=100');
   });
 
-  // it('should edit a file', async () => {
-  //   await computer.execute({
-  //     tool: 'str_replace_editor',
-  //     params: {
-  //       command: 'create',
-  //       path: '/tmp/test.txt',
-  //       file_text: 'Hello world!',
-  //     },
-  //   });
-
-  //   const message = await computer.execute({
-  //     tool: 'str_replace_editor',
-  //     params: {
-  //       command: 'view',
-  //       path: '/tmp/test.txt',
-  //     },
-  //   });
-  //   expect(message.tool_result.output).toBe('Hello world!');
-  // });
-
   afterAll(async () => {
     await computer.close();
   });
