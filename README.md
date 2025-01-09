@@ -32,6 +32,12 @@ const computer = new Computer();
 // Connect to the remote computer
 await computer.connect();
 
+// Perform a high-level objective
+await computer.do('create a file, write a poem and md5 hash it');
+
+// Take a screenshot
+const screenshot = await computer.screenshot();
+
 // Execute a bash command
 const result = await computer.execute({
   tool: 'bash',
@@ -56,8 +62,8 @@ await computer.execute({
   },
 });
 
-// Take a screenshot
-const screenshot = await computer.screenshot();
+// Close connection
+await computer.close();
 ```
 
 ## Supported Actions
