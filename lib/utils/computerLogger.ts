@@ -70,7 +70,7 @@ export class ComputerLogger {
         message.tool_result.base64_image,
         'base64'
       );
-      fs.writeFileSync(screenshot_file, imageBuffer);
+      fs.writeFileSync(screenshot_file, new Uint8Array(imageBuffer));
       return screenshot_file;
     }
     return null;
