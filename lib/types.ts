@@ -6,13 +6,11 @@ import { ToolSchema, type Tool } from '@modelcontextprotocol/sdk/types.js';
 /**
  * Configuration for connecting to the HDR API
  * @property api_key - API key for authentication, defaults to HDR_API_KEY env var
- * @property ws_url - WebSocket API endpoint, defaults to wss://api.hdr.is
- * @property mcp - MCP API endpoint
+ * @property ws_url - Base resource acquisition endpoint, defaults to wss://api.hdr.is
  */
 export const HDRConfig = z.object({
   api_key: z.string().default(process.env.HDR_API_KEY || ''),
   ws_url: z.string().default('wss://api.hdr.is/compute/ephemeral'),
-  mcp_url: z.string(),
   log_dir: z.string().default('./computer_logs'),
   log_conversation: z.boolean().default(true),
 });
@@ -66,7 +64,7 @@ export const MachineMetadata = z.object({
   display_width: z.number().nullable(),
   display_num: z.number().nullable(),
   arch: z.string().nullable(),
-  hostname: z.string().nullable(),
+  machine_id: z.string().nullable(),
   access_token: z.string().nullable(),
 });
 export type MachineMetadata = z.infer<typeof MachineMetadata>;

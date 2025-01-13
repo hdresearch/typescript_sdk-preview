@@ -38,6 +38,8 @@ import type {
 import { EventSource } from 'eventsource';
 global.EventSource = EventSource;
 
+const EVENT_METADATA_READY = 'machine-metadata-ready';
+
 const logger = createModuleLogger('Computer');
 
 /**
@@ -45,7 +47,7 @@ const logger = createModuleLogger('Computer');
  */
 export interface IComputer {
   /** Establishes a WebSocket connection to the computer control server */
-  connect(): Promise<void[]>;
+  connect(): Promise<void>;
   /** Executes a specified command action on the connected computer */
   execute(command: Action): Promise<ComputerMessage>;
   /** Checks if the WebSocket connection is currently active */
@@ -56,10 +58,8 @@ export interface IComputer {
  * Configuration options for the Computer instance
  */
 export interface ComputerOptions {
-  /** Hudson Server WebSocket URL */
+  /** Hudson Server base URL */
   wsUrl?: string;
-  /** Hudson Server MCP URL */
-  mcpUrl?: string;
   /** HDR API key for authentication */
   apiKey?: string;
   /** Set of available tools for computer control */
@@ -83,7 +83,6 @@ export interface ComputerOptions {
  */
 const defaultOptions: ComputerOptions = {
   wsUrl: process.env.HDR_WS_URL || 'wss://api.hdr.is/compute/ephemeral',
-  mcpUrl: process.env.HDR_MCP_URL || '',
   tools: new Set([bashTool, computerTool]),
   onOpen: () => {},
   onMessage: () => {},
@@ -128,7 +127,6 @@ export class Computer extends EventEmitter implements IComputer {
     this.options = { ...defaultOptions, ...options };
     this.config = HDRConfig.parse({
       ws_url: this.options.wsUrl,
-      mcp_url: this.options.mcpUrl,
       api_key: this.options.apiKey,
     });
     this.logger = new ComputerLogger();
@@ -207,7 +205,10 @@ export class Computer extends EventEmitter implements IComputer {
    * @private
    */
   private handleConnectionMessage(message: ComputerMessage) {
-    const tryParse = MachineMetadata.safeParse(message.tool_result.system);
+    if (!message.tool_result.system) return;
+    const tryParse = MachineMetadata.safeParse(
+      JSON.parse(message.tool_result.system)
+    );
 
     if (tryParse.success) {
       const machineMetadata = tryParse.data;
@@ -222,6 +223,8 @@ export class Computer extends EventEmitter implements IComputer {
 
       this.options.tools?.delete(computerTool);
       this.options.tools?.add(updatedComputerTool);
+
+      this.emit(EVENT_METADATA_READY);
     }
   }
 
@@ -229,8 +232,9 @@ export class Computer extends EventEmitter implements IComputer {
    * Establishes WebSocket and SSE (MCP) connection
    * @returns {Promise<void[]>}
    */
-  public async connect(): Promise<void[]> {
-    return Promise.all([this.connectWS(), this.connectMcpClient()]);
+  public async connect(): Promise<void> {
+    await this.connectWS();
+    await this.connectMcpClient();
   }
 
   /**
@@ -239,7 +243,8 @@ export class Computer extends EventEmitter implements IComputer {
    */
   private async connectWS(): Promise<void> {
     return new Promise<void>((resolve, reject) => {
-      this.ws = new WebSocket(this.config.ws_url, {
+      const wsUrl = `${this.config.ws_url}`;
+      this.ws = new WebSocket(wsUrl, {
         headers: { Authorization: `Bearer ${this.config.api_key}` },
       });
 
@@ -270,18 +275,61 @@ export class Computer extends EventEmitter implements IComputer {
    */
   private async connectMcpClient(): Promise<void> {
     return new Promise<void>((resolve, reject) => {
-      const options: ClientOptions = {
-        capabilities: {},
-      };
-      this.mcpClient = new Client(mcpClientInfo, options);
-      const url = new URL(`${this.config.mcp_url}`);
-      const transport = new SSEClientTransport(url);
+      // Await welcome message with timeout; this contains the machine ID needed for MCP connection
+      const TIMEOUT_MS = 5000;
+      const mcpUrlPromise = new Promise<string>((resolve, reject) => {
+        if (this.machineMetadata?.machine_id)
+          resolve(this.machineMetadata.machine_id);
+        const timeoutHandle = setTimeout(
+          () => reject('Timed out while waiting for welcome message'),
+          TIMEOUT_MS
+        );
 
-      this.mcpClient
-        .connect(transport)
-        .then(resolve)
-        .catch((e) => reject(`MCP client failed to connect: ${e}`));
+        const cleanup = () => {
+          clearTimeout(timeoutHandle);
+          this.removeListener(EVENT_METADATA_READY, onReady);
+        };
+
+        const onReady = () => {
+          cleanup();
+          resolve(`${this.getHostname()}/mcp`);
+        };
+
+        this.on(EVENT_METADATA_READY, onReady);
+      });
+
+      mcpUrlPromise.then((mcpUrl) => {
+        const options: ClientOptions = {
+          capabilities: {},
+        };
+        this.mcpClient = new Client(mcpClientInfo, options);
+        const url = new URL(mcpUrl);
+        const transport = new SSEClientTransport(url);
+
+        this.mcpClient
+          .connect(transport)
+          .then(resolve)
+          .catch((e) => reject(`MCP client failed to connect: ${e}`));
+      });
     });
+  }
+
+  /**
+   * Returns the hostname of the machine, based on the machine_id received in the welcome message.
+   * @private
+   */
+  private getHostname(): string {
+    if (!this.machineMetadata)
+      throw new Error(
+        'Unable to resolve hostname; Computer.machineMetadata is undefined'
+      );
+    else if (this.machineMetadata.machine_id === null) {
+      console.warn(
+        'Remote machine returned a null machine_id; unless this is intentional, this should be regarded as a server-side error'
+      );
+      return 'http://localhost:8080';
+    } else
+      return `https://api.hdr.is/compute/${this.machineMetadata.machine_id}`;
   }
 
   /**
@@ -422,8 +470,7 @@ export class Computer extends EventEmitter implements IComputer {
     serverInfo: StartServerResponse | null;
     error: string | null;
   }> {
-    // TODO: Magic string
-    const url = `${this.config.mcp_url}/register_server`;
+    const url = `${this.getHostname()}/mcp/register_server`;
 
     const request: StartServerRequest = {
       name,

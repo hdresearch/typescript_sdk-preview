@@ -24,7 +24,13 @@ describe('Computer Tests', () => {
     it('should handle connection message', async () => {
       expect(computer.sessionId).toBeDefined();
       expect(computer.machineMetadata).toBeDefined();
-      expect(computer.listComputerUseTools()).toEqual([bashTool, computerTool]);
+      const tools = computer.listComputerUseTools();
+      expect(tools.find((tool) => tool.name == bashTool.name)?.type).toEqual(
+        bashTool.type
+      );
+      expect(
+        tools.find((tool) => tool.name == computerTool.name)?.type
+      ).toEqual(computerTool.type);
     });
 
     it('should handle send message', async () => {
@@ -142,23 +148,7 @@ describe('Computer Tests', () => {
     });
   });
 
-  // it('should edit a file', async () => {
-  //   await computer.execute({
-  //     tool: 'str_replace_editor',
-  //     params: {
-  //       command: 'create',
-  //       path: '/tmp/test.txt',
-  //       file_text: 'Hello world!',
-  //     },
-  //   });
-
-  //   const message = await computer.execute({
-  //     tool: 'str_replace_editor',
-  //     params: {
-  //       command: 'view',
-  //       path: '/tmp/test.txt',
-  //     },
-  //   });
-  //   expect(message.tool_result.output).toBe('Hello world!');
-  // });
+  afterAll(async () => {
+    await computer.close();
+  });
 });
