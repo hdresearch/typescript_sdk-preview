@@ -38,6 +38,7 @@ export interface ComputerOptions {
   apiKey?: string;
   /** Set of available tools for computer control */
   tools?: Set<ToolI>;
+  logOutput?: boolean;
   /** Callback function for handling incoming messages */
   onMessage: (message: ComputerMessage) => void | Promise<void>;
   /** Function to parse incoming WebSocket messages */
@@ -58,6 +59,7 @@ export interface ComputerOptions {
 const defaultOptions: ComputerOptions = {
   baseUrl: process.env.HDR_BASE_URL || 'wss://api.hdr.is/compute/ephemeral',
   tools: new Set([bashTool, computerTool]),
+  logOutput: true,
   onOpen: () => {},
   onMessage: () => {},
   onError: () => {},
@@ -138,7 +140,9 @@ export class Computer extends EventEmitter implements IComputer {
   private onMessage(message: MessageEvent) {
     const parsedMessage = this.parseMessage(message);
     this.setUpdatedAt(parsedMessage.metadata.response_timestamp.getTime());
-    this.logger.logReceive(parsedMessage);
+    if (this.options.logOutput) {
+      this.logger.logReceive(parsedMessage);
+    }
     this.handleConnectionMessage(parsedMessage);
     this.options.onMessage(parsedMessage);
   }
@@ -234,7 +238,9 @@ export class Computer extends EventEmitter implements IComputer {
       throw new Error('WebSocket is not connected');
     }
 
-    this.logger.logSend(data);
+    if (this.options.logOutput) {
+      this.logger.logSend(data);
+    }
 
     const processed = this.options.beforeSend?.(data) ?? data;
     const message =
