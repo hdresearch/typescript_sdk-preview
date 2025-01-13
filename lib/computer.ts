@@ -532,9 +532,10 @@ export class Computer extends EventEmitter implements IComputer {
       );
     return this.mcpClient.listTools().then((x) =>
       x.tools.map((tool) => {
+        const { inputSchema, ...rest } = tool;
         const betaTool: BetaTool = {
-          ...tool,
-          input_schema: tool.inputSchema,
+          ...rest,
+          input_schema: inputSchema,
         };
         return betaTool;
       })

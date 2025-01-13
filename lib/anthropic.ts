@@ -16,6 +16,8 @@ import {
 import { logger } from '../lib/utils/logger';
 import { makeToolResult } from './tools';
 import { ToolResult } from '../lib/types';
+import { UnknownAction } from './schemas/unknownAction';
+import type { ToolResultBlockParam } from '@anthropic-ai/sdk/resources/index.mjs';
 
 function systemCapability(computer: Computer) {
   return `<SYSTEM_CAPABILITY>
@@ -99,39 +101,66 @@ export async function useComputer(
      *
      * @param block - The tool use request from Claude
      */
-    async function handleToolResult(block: BetaToolUseBlock) {
-      // Validate the tool request
-      const parseAction = Action.safeParse({
-        tool: block.name,
-        params: block.input,
-      });
+    async function handleToolRequest(block: BetaToolUseBlock) {
+      // Select an executor function based on the shape of the 'block'
+      const execute = (() => {
+        const parseAction = Action.safeParse({
+          tool: block.name,
+          params: block.input,
+        });
 
-      let result: ToolResult;
-      // Handle invalid tool requests
-      if (!parseAction.success) {
-        result = ToolResult.parse({
+        if (parseAction.success) {
+          logger.debug(parseAction.data, 'Parsed action:');
+          return async () =>
+            makeToolResult(
+              (await computer.execute(parseAction.data)).tool_result,
+              block.id
+            );
+        }
+
+        const parseUnknownAction = UnknownAction.safeParse({
+          tool: block.name,
+          params: block.input,
+        });
+
+        if (parseUnknownAction.success) {
+          logger.debug(parseUnknownAction.data, 'Parsed unknown action:');
+          return async () => {
+            const toolResult = await computer.callMcpTool(
+              parseUnknownAction.data.tool,
+              parseUnknownAction.data.params
+            );
+            const result: ToolResultBlockParam = {
+              tool_use_id: block.id,
+              type: 'tool_result',
+              content: JSON.stringify(toolResult.content),
+              is_error: toolResult.isError
+                ? Boolean(toolResult.isError)
+                : undefined,
+            };
+            return result;
+          };
+        }
+
+        const result = ToolResult.parse({
           error: `Tool ${block.name} failed is invalid`,
           output: null,
           base64_image: null,
           system: null,
         });
         const errorResult = makeToolResult(result, block.id);
-        console.debug(
+        logger.debug(
           { tool_use_error: errorResult },
           'Could not parse tool use'
         );
         toolResults.push(errorResult);
-        return;
-      }
+        return null;
+      })();
 
-      // Log the parsed action for debugging
-      logger.debug(JSON.stringify(parseAction.data), 'Parsed action:');
-
-      // Execute the tool request and store result
-      const computerResponse = await computer.execute(parseAction.data);
-      result = await computerResponse.tool_result;
-      if (result) {
-        const toolResult = makeToolResult(result, block.id);
+      if (execute) {
+        // Execute the tool request and store result
+        const toolResult = await execute();
+        logger.info(toolResult, 'Tool Result:');
         toolResults.push(toolResult);
       }
     }
@@ -146,7 +175,7 @@ export async function useComputer(
       } else if (content.type === 'tool_use') {
         // Execute and log tool usage
         logger.info({ command: content }, 'Executing: ');
-        await handleToolResult(content);
+        await handleToolRequest(content);
       }
     }
 

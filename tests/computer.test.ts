@@ -112,12 +112,12 @@ describe('Computer Tests', () => {
 
     it('should have a query tool', async () => {
       const tools = await computer.listMcpTools();
-      expect(tools.find((tool) => tool.name === 'kips/query')).toBeDefined();
+      expect(tools.find((tool) => tool.name === 'query')).toBeDefined();
     });
 
     it('should list both computer use and mcp tools', async () => {
       const tools = await computer.listAllTools();
-      expect(tools.find((tool) => tool.name === 'kips/update')).toBeDefined();
+      expect(tools.find((tool) => tool.name === 'update')).toBeDefined();
       expect(
         tools.find(
           (tool) =>
@@ -127,22 +127,15 @@ describe('Computer Tests', () => {
     });
 
     it('should invoke the query tool', async () => {
-      const toolResult = await computer.callMcpTool('kips/query', {
+      const toolResult = await computer.callMcpTool('query', {
         sql: 'SELECT 1;',
       });
       expect(toolResult.isError).toBeFalse();
     });
 
     it('should not invoke a fake tool', async () => {
-      const toolPromise = computer.callMcpTool('kips/fake-tool', {
+      const toolPromise = computer.callMcpTool('fake-tool', {
         fakeArg: false,
-      });
-      expect(toolPromise).rejects.toThrow();
-    });
-
-    it('should not invoke a tool on a fake server', async () => {
-      const toolPromise = computer.callMcpTool('kups/query', {
-        sql: 'SELECT 1;',
       });
       expect(toolPromise).rejects.toThrow();
     });
