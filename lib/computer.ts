@@ -372,7 +372,11 @@ export class Computer extends EventEmitter implements IComputer {
       await new Promise((resolve) => setTimeout(resolve, 100));
     }
   }
-
+  /**
+   * Gets the URL for streaming video from the connected computer
+   * @returns {Promise<string>} URL for accessing the video stream
+   * @throws {Error} If computer is not connected or metadata is unavailable
+   */
   public async videoStreamUrl() {
     if (!this.isConnected()) {
       throw new Error('Computer is not connected.');

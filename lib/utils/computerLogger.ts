@@ -10,12 +10,24 @@ import type { Action } from '../schemas/action';
 
 const logger = createModuleLogger('ComputerLogger');
 
+/**
+ * Class for logging computer interactions and screenshots
+ * Handles saving commands, responses and screenshots to disk
+ */
 export class ComputerLogger {
   private logDir: string;
   private conversationFile: string;
   private runDir: string;
   private conversationLogFile: string;
 
+  /**
+   * Creates a new ComputerLogger instance
+   * @param options - Configuration options for logging
+   * @param options.logDir - Directory to store logs in
+   * @param options.logConversation - Whether to log conversation history
+   * @param options.logScreenshot - Whether to save screenshots
+   * @param options.runDir - Subdirectory for current run's logs
+   */
   constructor(
     options: {
       logDir?: string;
@@ -36,13 +48,18 @@ export class ComputerLogger {
   }
 
   /**
-   * Logs a command to the conversation log file
-   * @param command - The command to log
+   * Logs an outgoing command to the conversation log file
+   * @param command - The command action to log
    */
   public logSend(command: Action): void {
     fs.appendFileSync(this.conversationLogFile, JSON.stringify(command) + '\n');
   }
 
+  /**
+   * Logs an incoming message response to the conversation log file
+   * Also handles saving any screenshots included in the message
+   * @param message - The message response to log
+   */
   public logReceive(message: ComputerMessage): void {
     logger.debug(`Logging message: ${JSON.stringify(message)}`);
     const screenshot_file = this.logScreenshot(message);
@@ -58,6 +75,12 @@ export class ComputerLogger {
     );
   }
 
+  /**
+   * Saves a screenshot from a message to disk if one is present
+   * @param message - Message potentially containing a screenshot
+   * @returns Path to saved screenshot file, or null if no screenshot
+   * @private
+   */
   private logScreenshot(message: ComputerMessage): string | null {
     if (message.tool_result.base64_image) {
       const timestamp = message.metadata.request_timestamp.toISOString();
@@ -76,6 +99,9 @@ export class ComputerLogger {
     return null;
   }
 
+  /**
+   * Cleans up all log files and directories created by this logger instance
+   */
   public cleanup(): void {
     logger.debug(`Cleaning up run directory: ${this.runDir}`);
     fs.readdirSync(this.runDir).forEach((file) => {
