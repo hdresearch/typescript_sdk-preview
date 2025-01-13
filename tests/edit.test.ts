@@ -22,7 +22,7 @@ describe('Edit tests', () => {
     computer = new Computer({ baseUrl });
     try {
       await computer.connect();
-    } catch (e) {
+    } catch {
       throw new Error(`failed to connect to computer at ${baseUrl}`);
     }
   });

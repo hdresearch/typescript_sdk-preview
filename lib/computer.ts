@@ -12,6 +12,7 @@ import { createModuleLogger } from './utils/logger';
 import { EventEmitter } from 'events';
 import { Action } from './schemas/action';
 import { useComputer } from './anthropic';
+import { getStreamUrl, getWSSUrl } from './utils/urls';
 
 const logger = createModuleLogger('Computer');
 
@@ -37,6 +38,7 @@ export interface ComputerOptions {
   apiKey?: string;
   /** Set of available tools for computer control */
   tools?: Set<ToolI>;
+  logOutput?: boolean;
   /** Callback function for handling incoming messages */
   onMessage: (message: ComputerMessage) => void | Promise<void>;
   /** Function to parse incoming WebSocket messages */
@@ -55,8 +57,9 @@ export interface ComputerOptions {
  * Default configuration options for the Computer instance
  */
 const defaultOptions: ComputerOptions = {
-  baseUrl: process.env.HDR_BASE_URL || 'wss://api.hdr.is/compute/ephemeral',
+  baseUrl: process.env.HDR_BASE_URL || 'https://api.hdr.is/compute/',
   tools: new Set([bashTool, computerTool]),
+  logOutput: true,
   onOpen: () => {},
   onMessage: () => {},
   onError: () => {},
@@ -137,7 +140,9 @@ export class Computer extends EventEmitter implements IComputer {
   private onMessage(message: MessageEvent) {
     const parsedMessage = this.parseMessage(message);
     this.setUpdatedAt(parsedMessage.metadata.response_timestamp.getTime());
-    this.logger.logReceive(parsedMessage);
+    if (this.options.logOutput) {
+      this.logger.logReceive(parsedMessage);
+    }
     this.handleConnectionMessage(parsedMessage);
     this.options.onMessage(parsedMessage);
   }
@@ -169,7 +174,9 @@ export class Computer extends EventEmitter implements IComputer {
    * @private
    */
   private handleConnectionMessage(message: ComputerMessage) {
-    const tryParse = MachineMetadata.safeParse(message.tool_result.system);
+    const tryParse = MachineMetadata.safeParse(
+      JSON.parse(message.tool_result.system ?? '{}')
+    );
 
     if (tryParse.success) {
       const machineMetadata = tryParse.data;
@@ -193,7 +200,9 @@ export class Computer extends EventEmitter implements IComputer {
    */
   public async connect(): Promise<void> {
     return new Promise((resolve, reject) => {
-      this.ws = new WebSocket(this.config.base_url, {
+      const wssUrl = getWSSUrl(this.config.base_url);
+      logger.info(`Connecting to ${wssUrl}`);
+      this.ws = new WebSocket(wssUrl, {
         headers: { Authorization: `Bearer ${this.config.api_key}` },
       });
 
@@ -229,7 +238,9 @@ export class Computer extends EventEmitter implements IComputer {
       throw new Error('WebSocket is not connected');
     }
 
-    this.logger.logSend(data);
+    if (this.options.logOutput) {
+      this.logger.logSend(data);
+    }
 
     const processed = this.options.beforeSend?.(data) ?? data;
     const message =
@@ -344,5 +355,38 @@ export class Computer extends EventEmitter implements IComputer {
    */
   public listTools(): ToolI[] {
     return Array.from(this.options.tools ?? new Set());
+  }
+
+  /**
+   * Waits for machine metadata to be available
+   * @param {number} timeoutMs - Maximum time to wait in milliseconds (default: 10000)
+   * @throws {Error} If metadata is not available within timeout period
+   * @private
+   */
+  private async waitForMetadata(timeoutMs: number = 10000): Promise<void> {
+    const startTime = Date.now();
+    while (!this.machineMetadata) {
+      if (Date.now() - startTime > timeoutMs) {
+        throw new Error('Timeout waiting for machine metadata');
+      }
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+  }
+  /**
+   * Gets the URL for streaming video from the connected computer
+   * @returns {Promise<string>} URL for accessing the video stream
+   * @throws {Error} If computer is not connected or metadata is unavailable
+   */
+  public async videoStreamUrl() {
+    if (!this.isConnected()) {
+      throw new Error('Computer is not connected.');
+    }
+
+    await this.waitForMetadata();
+
+    return getStreamUrl(
+      this.config.base_url,
+      this.machineMetadata!.machine_id!
+    );
   }
 }

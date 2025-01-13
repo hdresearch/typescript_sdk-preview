@@ -35,7 +35,26 @@ interface ImageContent {
   type: 'image';
   source: ImageSource;
 }
-
+/**
+ * Converts a ToolResult into a BetaToolResultBlockParam for Claude's tool use API
+ *
+ * Takes a ToolResult from executing a tool and formats it into the structure
+ * expected by Claude's tool use API. Handles both text output and base64 encoded
+ * images.
+ *
+ * @param result - The result from executing a tool, containing output/error/image
+ * @param toolUseId - Unique ID for this tool use instance from Claude
+ * @returns Formatted tool result block for Claude's API
+ *
+ * @example
+ * const result = {
+ *   output: "Hello world",
+ *   error: null,
+ *   base64_image: null,
+ *   system: null
+ * };
+ * makeToolResult(result, "abc123");
+ */
 export function makeToolResult(
   result: ToolResult,
   toolUseId: string
