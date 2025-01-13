@@ -169,7 +169,9 @@ export class Computer extends EventEmitter implements IComputer {
    * @private
    */
   private handleConnectionMessage(message: ComputerMessage) {
-    const tryParse = MachineMetadata.safeParse(message.tool_result.system);
+    const tryParse = MachineMetadata.safeParse(
+      JSON.parse(message.tool_result.system ?? '{}')
+    );
 
     if (tryParse.success) {
       const machineMetadata = tryParse.data;
@@ -344,5 +346,31 @@ export class Computer extends EventEmitter implements IComputer {
    */
   public listTools(): ToolI[] {
     return Array.from(this.options.tools ?? new Set());
+  }
+
+  /**
+   * Waits for machine metadata to be available
+   * @param {number} timeoutMs - Maximum time to wait in milliseconds (default: 10000)
+   * @throws {Error} If metadata is not available within timeout period
+   * @private
+   */
+  private async waitForMetadata(timeoutMs: number = 10000): Promise<void> {
+    const startTime = Date.now();
+    while (!this.machineMetadata) {
+      if (Date.now() - startTime > timeoutMs) {
+        throw new Error('Timeout waiting for machine metadata');
+      }
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+  }
+
+  public async videoStreamUrl() {
+    if (!this.isConnected()) {
+      throw new Error('Computer is not connected.');
+    }
+
+    await this.waitForMetadata();
+
+    return `https://api.hdr.is/compute/${this.machineMetadata!.hostname}/stream`;
   }
 }
