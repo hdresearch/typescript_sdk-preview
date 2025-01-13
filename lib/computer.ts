@@ -12,6 +12,7 @@ import { createModuleLogger } from './utils/logger';
 import { EventEmitter } from 'events';
 import { Action } from './schemas/action';
 import { useComputer } from './anthropic';
+import { getStreamUrl, getWSSUrl } from './utils/urls';
 
 const logger = createModuleLogger('Computer');
 
@@ -195,7 +196,9 @@ export class Computer extends EventEmitter implements IComputer {
    */
   public async connect(): Promise<void> {
     return new Promise((resolve, reject) => {
-      this.ws = new WebSocket(this.config.base_url, {
+      const wssUrl = getWSSUrl(this.config.base_url);
+      logger.info(`Connecting to ${wssUrl}`);
+      this.ws = new WebSocket(wssUrl, {
         headers: { Authorization: `Bearer ${this.config.api_key}` },
       });
 
@@ -371,6 +374,9 @@ export class Computer extends EventEmitter implements IComputer {
 
     await this.waitForMetadata();
 
-    return `https://api.hdr.is/compute/${this.machineMetadata!.hostname}/stream`;
+    return getStreamUrl(
+      this.config.base_url,
+      this.machineMetadata!.machine_id!
+    );
   }
 }
