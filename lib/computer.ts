@@ -57,7 +57,7 @@ export interface ComputerOptions {
  * Default configuration options for the Computer instance
  */
 const defaultOptions: ComputerOptions = {
-  baseUrl: process.env.HDR_BASE_URL || 'wss://api.hdr.is/compute/ephemeral',
+  baseUrl: process.env.HDR_BASE_URL || 'https://api.hdr.is/compute/',
   tools: new Set([bashTool, computerTool]),
   logOutput: true,
   onOpen: () => {},

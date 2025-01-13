@@ -3,9 +3,11 @@ import 'dotenv/config';
 import type { BetaMessageParam } from '@anthropic-ai/sdk/resources/beta/index.mjs';
 
 /**
- * Configuration for connecting to the HDR API
+ * Configuration schema for connecting to the HDR API
  * @property api_key - API key for authentication, defaults to HDR_API_KEY env var
- * @property base_url - WebSocket API endpoint, defaults to wss://api.hdr.is
+ * @property base_url - WebSocket API endpoint, defaults to https://api.hdr.is/compute/
+ * @property log_dir - Directory for storing logs, defaults to ./computer_logs
+ * @property log_conversation - Whether to log conversations, defaults to true
  */
 export const HDRConfig = z.object({
   api_key: z.string().default(process.env.HDR_API_KEY || ''),
@@ -15,6 +17,13 @@ export const HDRConfig = z.object({
 });
 export type HDRConfig = z.infer<typeof HDRConfig>;
 
+/**
+ * Configuration schema for logging options
+ * @property logDir - Directory for storing logs
+ * @property runDir - Subdirectory for current run, defaults to timestamp
+ * @property logScreenshot - Whether to save screenshots, defaults to true
+ * @property logConversation - Whether to log conversations, defaults to true
+ */
 export const LogConfig = z.object({
   logDir: z.string().default('./computer_logs'),
   runDir: z.string().default(new Date().toISOString()),
@@ -23,6 +32,13 @@ export const LogConfig = z.object({
 });
 export type LogConfig = z.infer<typeof LogConfig>;
 
+/**
+ * Schema for tool execution results
+ * @property output - Text output from the tool, if any
+ * @property error - Error message if tool execution failed
+ * @property base64_image - Base64 encoded screenshot if taken
+ * @property system - System-level metadata
+ */
 export const ToolResult = z.object({
   output: z.string().nullable(),
   error: z.string().nullable(),
@@ -31,20 +47,43 @@ export const ToolResult = z.object({
 });
 export type ToolResult = z.infer<typeof ToolResult>;
 
+/**
+ * Schema for message metadata
+ * @property session_id - UUID for the current session
+ * @property message_id - UUID for this specific message
+ * @property request_timestamp - When the request was sent
+ * @property response_timestamp - When the response was received
+ */
 const Metadata = z.object({
-  session_id: z.string().uuid(),
-  message_id: z.string().uuid(),
+  session_id: z
+    .string()
+    .uuid()
+    .describe('Unique identifier for the current session'),
+  message_id: z
+    .string()
+    .uuid()
+    .describe('Unique identifier for this specific message'),
   request_timestamp: z
     .string()
     .datetime()
-    .transform((x) => new Date(x)),
+    .transform((x) => new Date(x))
+    .describe('Timestamp when the request was sent, converted to Date object'),
   response_timestamp: z
     .string()
     .datetime()
-    .transform((x) => new Date(x)),
+    .transform((x) => new Date(x))
+    .describe(
+      'Timestamp when the response was received, converted to Date object'
+    ),
 });
 type Metadata = z.infer<typeof Metadata>;
 
+/**
+ * Schema for messages received from the computer
+ * @property raw_input - The original input command
+ * @property tool_result - Results from tool execution
+ * @property metadata - Message metadata
+ */
 export const ComputerMessage = z.object({
   raw_input: z.string(),
   tool_result: ToolResult,
@@ -52,12 +91,19 @@ export const ComputerMessage = z.object({
 });
 export type ComputerMessage = z.infer<typeof ComputerMessage>;
 
+/**
+ * Extended schema for logged computer messages
+ * Includes optional path to saved screenshot file
+ */
 export const ComputerMessageLog = ComputerMessage.extend({
   screenshot_file: z.string().optional(),
 });
 export type ComputerMessageLog = z.infer<typeof ComputerMessageLog>;
 
-// The data payload that is expected to be stringified in `output.system` on connection.
+/**
+ * Schema for machine metadata received on connection
+ * Contains information about the remote system's display and architecture
+ */
 export const MachineMetadata = z.object({
   display_height: z.number().nullable(),
   display_width: z.number().nullable(),
@@ -68,6 +114,13 @@ export const MachineMetadata = z.object({
 });
 export type MachineMetadata = z.infer<typeof MachineMetadata>;
 
+/**
+ * Interface describing a tool that can be used to interact with the computer
+ * @property name - Unique identifier for the tool
+ * @property type - Type/version of the tool
+ * @property display_height_px - Optional display height for GUI tools
+ * @property display_width_px - Optional display width for GUI tools
+ */
 export interface ToolI {
   name: string;
   type: string;
@@ -75,6 +128,14 @@ export interface ToolI {
   display_width_px?: number;
 }
 
+/**
+ * Interface for Claude AI sampling options
+ * @property model - Claude model to use
+ * @property max_tokens - Maximum tokens in response
+ * @property system - System prompt
+ * @property messages - Conversation history
+ * @property temperature - Sampling temperature (0-1)
+ */
 export interface DefaultSamplingOptions {
   model: string;
   max_tokens: number;
@@ -83,6 +144,9 @@ export interface DefaultSamplingOptions {
   temperature: number;
 }
 
+/**
+ * Default sampling options for Claude AI
+ */
 export const defaultSamplingOptions: DefaultSamplingOptions = {
   model: 'claude-3-5-sonnet-20241022',
   max_tokens: 4096,
