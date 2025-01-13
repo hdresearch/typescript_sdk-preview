@@ -9,7 +9,7 @@ import type { BetaMessageParam } from '@anthropic-ai/sdk/resources/beta/index.mj
  */
 export const HDRConfig = z.object({
   api_key: z.string().default(process.env.HDR_API_KEY || ''),
-  base_url: z.string().default('wss://api.hdr.is/compute/ephemeral'),
+  base_url: z.string().default('https://api.hdr.is/compute/'),
   log_dir: z.string().default('./computer_logs'),
   log_conversation: z.boolean().default(true),
 });
@@ -63,7 +63,7 @@ export const MachineMetadata = z.object({
   display_width: z.number().nullable(),
   display_num: z.number().nullable(),
   arch: z.string().nullable(),
-  hostname: z.string().nullable(),
+  machine_id: z.string().nullable(),
   access_token: z.string().nullable(),
 });
 export type MachineMetadata = z.infer<typeof MachineMetadata>;
