@@ -5,7 +5,7 @@
  * @example
  * getWSSUrl('https://api.hdr.is/compute') // Returns 'wss://api.hdr.is/compute/ephemeral'
  */
-export function getWSSUrl(baseURL: string) {
+export function getWSSUrl(baseURL: string): string {
   const url = new URL(baseURL);
   // Replace http(s) protocol with wss
   url.protocol = 'wss:';
@@ -22,6 +22,6 @@ export function getWSSUrl(baseURL: string) {
  * @example
  * getStreamUrl('https://api.hdr.is', '123abc') // Returns 'https://api.hdr.is/compute/123abc/stream'
  */
-export function getStreamUrl(baseURL: string, machineId: string) {
+export function getStreamUrl(baseURL: string, machineId: string): string {
   return `${baseURL}/compute/${machineId}/stream`;
 }
