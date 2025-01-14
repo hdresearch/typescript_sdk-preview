@@ -130,7 +130,6 @@ export class Computer extends EventEmitter implements IComputer {
   sessionId: string | null = null;
   /** Use Computer.getMetadata() to get - metadata is set on connect() invocation via welcome message */
   private machineMetadata: MachineMetadata | null = null;
-  tools: Set<BetaToolUnion> = new Set();
 
   /**
    * Creates a new Computer instance
