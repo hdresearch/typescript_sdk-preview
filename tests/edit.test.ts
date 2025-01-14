@@ -1,5 +1,5 @@
 import { describe, beforeAll, afterAll, it, expect } from 'bun:test';
-import { Computer } from '../lib/computer';
+import { Computer, ConnectOptions } from '../lib/computer';
 import { ComputerMessage } from '../lib/types';
 import { join } from 'path';
 import os from 'os';
@@ -9,7 +9,10 @@ const TMPDIR = '/tmp';
 const FILEPATH = join(TMPDIR, 'hdr_typescript_sdk_test.txt');
 const FILEPATH_FAKE = join(TMPDIR, 'hdr_typescript_sdk_does_not_exist.txt');
 
-const TEST_URL = 'http://localhost:8080/ws';
+const TEST_CONNECT_OPTIONS: ConnectOptions = {
+  wsUrl: 'http://localhost:8080/ws',
+  mcpUrl: 'http://localhost:8080/mcp',
+};
 
 describe('Edit tests', () => {
   let computer: Computer;
@@ -17,13 +20,8 @@ describe('Edit tests', () => {
   beforeAll(async () => {
     await cleanTempFiles();
 
-    computer = new Computer({ wsUrl: TEST_URL });
-    try {
-      await computer.connect();
-    } catch (e) {
-      console.error(`failed to connect to computer at ${TEST_URL}`);
-      throw e;
-    }
+    computer = new Computer();
+    await computer.connect(TEST_CONNECT_OPTIONS);
   });
 
   afterAll(async () => {

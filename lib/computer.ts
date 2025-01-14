@@ -39,6 +39,7 @@ import { EventSource } from 'eventsource';
 global.EventSource = EventSource;
 
 const EVENT_METADATA_READY = 'machine-metadata-ready';
+import { getMcpUrl as getMcpUrl, getStreamUrl, getWSSUrl } from './utils/urls';
 
 const logger = createModuleLogger('Computer');
 
@@ -55,15 +56,26 @@ export interface IComputer {
 }
 
 /**
+ * Options that may be passed to Computer.connect()
+ */
+export interface ConnectOptions {
+  /** Override the default WS URL, which is derived from Computer.options */
+  wsUrl?: string;
+  /** Override the default MCP URL, which is derived from Computer.options */
+  mcpUrl?: string;
+}
+
+/**
  * Configuration options for the Computer instance
  */
 export interface ComputerOptions {
   /** Hudson Server base URL */
-  wsUrl?: string;
+  baseUrl?: string;
   /** HDR API key for authentication */
   apiKey?: string;
   /** Set of available tools for computer control */
   tools?: Set<BetaToolUnion>;
+  logOutput?: boolean;
   /** Callback function for handling incoming messages */
   onMessage: (message: ComputerMessage) => void | Promise<void>;
   /** Function to parse incoming WebSocket messages */
@@ -82,8 +94,9 @@ export interface ComputerOptions {
  * Default configuration options for the Computer instance
  */
 const defaultOptions: ComputerOptions = {
-  wsUrl: process.env.HDR_WS_URL || 'wss://api.hdr.is/compute/ephemeral',
+  baseUrl: process.env.HDR_BASE_URL || 'https://api.hdr.is/compute/',
   tools: new Set([bashTool, computerTool]),
+  logOutput: true,
   onOpen: () => {},
   onMessage: () => {},
   onError: () => {},
@@ -115,7 +128,8 @@ export class Computer extends EventEmitter implements IComputer {
   createdAt: string;
   updatedAt: string | null = null;
   sessionId: string | null = null;
-  machineMetadata: MachineMetadata | null = null;
+  /** Use Computer.getMetadata() to get - metadata is set on connect() invocation via welcome message */
+  private machineMetadata: MachineMetadata | null = null;
   tools: Set<BetaToolUnion> = new Set();
 
   /**
@@ -126,7 +140,7 @@ export class Computer extends EventEmitter implements IComputer {
     super();
     this.options = { ...defaultOptions, ...options };
     this.config = HDRConfig.parse({
-      ws_url: this.options.wsUrl,
+      base_url: this.options.baseUrl,
       api_key: this.options.apiKey,
     });
     this.logger = new ComputerLogger();
@@ -173,7 +187,9 @@ export class Computer extends EventEmitter implements IComputer {
   private onMessage(message: MessageEvent) {
     const parsedMessage = this.parseMessage(message);
     this.setUpdatedAt(parsedMessage.metadata.response_timestamp.getTime());
-    this.logger.logReceive(parsedMessage);
+    if (this.options.logOutput) {
+      this.logger.logReceive(parsedMessage);
+    }
     this.handleConnectionMessage(parsedMessage);
     this.options.onMessage(parsedMessage);
   }
@@ -205,9 +221,8 @@ export class Computer extends EventEmitter implements IComputer {
    * @private
    */
   private handleConnectionMessage(message: ComputerMessage) {
-    if (!message.tool_result.system) return;
     const tryParse = MachineMetadata.safeParse(
-      JSON.parse(message.tool_result.system)
+      JSON.parse(message.tool_result.system ?? '{}')
     );
 
     if (tryParse.success) {
@@ -229,21 +244,22 @@ export class Computer extends EventEmitter implements IComputer {
   }
 
   /**
-   * Establishes WebSocket and SSE (MCP) connection
+   * Establishes WebSocket and SSE (MCP) connection, optionally overriding default connection URLs
    * @returns {Promise<void[]>}
    */
-  public async connect(): Promise<void> {
-    await this.connectWS();
-    await this.connectMcpClient();
+  public async connect(options?: ConnectOptions): Promise<void> {
+    await this.connectWS(options?.wsUrl);
+    await this.connectMcpClient(options?.mcpUrl);
   }
 
   /**
    * Establish WebSocket connection
    * @private
    */
-  private async connectWS(): Promise<void> {
+  private async connectWS(url?: string): Promise<void> {
     return new Promise<void>((resolve, reject) => {
-      const wsUrl = `${this.config.ws_url}`;
+      const wsUrl = url || getWSSUrl(this.config.base_url);
+      logger.info(`Connecting to ${wsUrl}`);
       this.ws = new WebSocket(wsUrl, {
         headers: { Authorization: `Bearer ${this.config.api_key}` },
       });
@@ -273,45 +289,17 @@ export class Computer extends EventEmitter implements IComputer {
    * Establish MCP Client connection
    * @private
    */
-  private async connectMcpClient(): Promise<void> {
-    return new Promise<void>((resolve, reject) => {
-      // Await welcome message with timeout; this contains the machine ID needed for MCP connection
-      const TIMEOUT_MS = 5000;
-      const mcpUrlPromise = new Promise<string>((resolve, reject) => {
-        if (this.machineMetadata?.machine_id)
-          resolve(this.machineMetadata.machine_id);
-        const timeoutHandle = setTimeout(
-          () => reject('Timed out while waiting for welcome message'),
-          TIMEOUT_MS
-        );
+  private async connectMcpClient(url?: string): Promise<void> {
+    const options: ClientOptions = {
+      capabilities: {},
+    };
+    this.mcpClient = new Client(mcpClientInfo, options);
 
-        const cleanup = () => {
-          clearTimeout(timeoutHandle);
-          this.removeListener(EVENT_METADATA_READY, onReady);
-        };
+    const metadata = await this.getMetadata();
+    const mcpUrl = url || getMcpUrl(this.config.base_url, metadata.machine_id);
+    const transport = new SSEClientTransport(new URL(mcpUrl));
 
-        const onReady = () => {
-          cleanup();
-          resolve(`${this.getHostname()}/mcp`);
-        };
-
-        this.on(EVENT_METADATA_READY, onReady);
-      });
-
-      mcpUrlPromise.then((mcpUrl) => {
-        const options: ClientOptions = {
-          capabilities: {},
-        };
-        this.mcpClient = new Client(mcpClientInfo, options);
-        const url = new URL(mcpUrl);
-        const transport = new SSEClientTransport(url);
-
-        this.mcpClient
-          .connect(transport)
-          .then(resolve)
-          .catch((e) => reject(`MCP client failed to connect: ${e}`));
-      });
-    });
+    await this.mcpClient.connect(transport);
   }
 
   /**
@@ -343,7 +331,9 @@ export class Computer extends EventEmitter implements IComputer {
       throw new Error('WebSocket is not connected');
     }
 
-    this.logger.logSend(data);
+    if (this.options.logOutput) {
+      this.logger.logSend(data);
+    }
 
     const processed = this.options.beforeSend?.(data) ?? data;
     const message =
@@ -570,5 +560,60 @@ export class Computer extends EventEmitter implements IComputer {
    */
   public async listAllTools(): Promise<BetaToolUnion[]> {
     return [...this.listComputerUseTools(), ...(await this.listMcpTools())];
+  }
+
+  /**
+   * Waits for machine metadata to be available
+   * @param {number} timeoutMs - Maximum time to wait in milliseconds (default: 10000)
+   * @throws {Error} If metadata is not available within timeout period
+   * @public
+   */
+  public async getMetadata(
+    timeoutMs: number = 10000
+  ): Promise<MachineMetadata> {
+    return new Promise<MachineMetadata>((resolve, reject) => {
+      if (this.machineMetadata) {
+        resolve(this.machineMetadata);
+      }
+
+      const timeoutHandle = setTimeout(
+        () => reject('Timed out while waiting for welcome message'),
+        timeoutMs
+      );
+
+      const cleanup = () => {
+        clearTimeout(timeoutHandle);
+        this.removeListener(EVENT_METADATA_READY, onReady);
+      };
+
+      const onReady = () => {
+        cleanup();
+        if (!this.machineMetadata)
+          throw new Error(
+            `Computer emitted '${EVENT_METADATA_READY}' but metadata is not ready.`
+          );
+        resolve(this.machineMetadata);
+      };
+
+      this.on(EVENT_METADATA_READY, onReady);
+    });
+  }
+  /**
+   * Gets the URL for streaming video from the connected computer
+   * @returns {Promise<string>} URL for accessing the video stream
+   * @throws {Error} If computer is not connected or metadata is unavailable
+   */
+  public async videoStreamUrl() {
+    if (!this.isConnected()) {
+      throw new Error('Computer is not connected.');
+    }
+
+    const machineMetadata = await this.getMetadata();
+    if (!machineMetadata.machine_id)
+      throw new Error(
+        'Failed to get video stream URL; machine does not have a machine ID'
+      );
+
+    return getStreamUrl(this.config.base_url, machineMetadata.machine_id);
   }
 }
