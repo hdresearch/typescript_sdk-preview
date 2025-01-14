@@ -139,7 +139,7 @@ describe('Edit tests', () => {
     expect(toolResult.tool_result.error).toBeString();
 
     // Try to undo edit on non-existent file
-    // Note that if previous tests fail (and do create a file), the Hudson instance can be "poisoned" with its undo history and may have to be restarted before this test will succeed.
+    // Note that if previous tests fail (and do create a file), the Vers instance can be "poisoned" with its undo history and may have to be restarted before this test will succeed.
     console.log('=== undo_edit ===');
     toolResult = await computer.execute({
       tool: 'str_replace_editor',

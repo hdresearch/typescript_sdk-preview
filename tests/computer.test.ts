@@ -92,9 +92,9 @@ describe('Computer Tests', () => {
       await computer.mcpPing();
     });
 
-    it('should be a Hudson Server', async () => {
+    it('should be a Vers Server', async () => {
       const implementation = await computer.getMcpServerVersion();
-      expect(implementation?.name).toBe('hudson-server');
+      expect(implementation?.name).toBe('vers-server');
     });
 
     it('should have tools capabilities', async () => {

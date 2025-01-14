@@ -143,8 +143,8 @@ export const defaultSamplingOptions: DefaultSamplingOptions = {
 };
 
 /**
- * Contains information required by Hudson to spawn a new MCP server.
- * @property command - The shell command Hudson will run to spawn the server (such as `npx` or `uvx`)
+ * Contains information required by Vers to spawn a new MCP server.
+ * @property command - The shell command Vers will run to spawn the server (such as `npx` or `uvx`)
  */
 export interface StartServerRequest {
   name: string;
@@ -152,18 +152,18 @@ export interface StartServerRequest {
 }
 
 /**
- * The response returned by Hudson when a server is successfully registered.
+ * The response returned by Vers when a server is successfully registered.
  */
 export const StartServerResponseSchema = z.object({
   tools: z.array(ToolSchema),
 });
 /**
- * The response returned by Hudson when a server is successfully registered.
+ * The response returned by Vers when a server is successfully registered.
  */
 export type StartServerResponse = z.infer<typeof StartServerResponseSchema>;
 
 /**
- * Represents an MCP server currently running on Hudson.
+ * Represents an MCP server currently running on Vers.
  */
 export interface McpServer {
   name: string;

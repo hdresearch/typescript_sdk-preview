@@ -69,7 +69,7 @@ export interface ConnectOptions {
  * Configuration options for the Computer instance
  */
 export interface ComputerOptions {
-  /** Hudson Server base URL */
+  /** Vers Server base URL */
   baseUrl?: string;
   /** HDR API key for authentication */
   apiKey?: string;
