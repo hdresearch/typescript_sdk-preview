@@ -321,7 +321,7 @@ export class Computer extends EventEmitter implements IComputer {
   private getHostname(): string {
     if (!this.machineMetadata)
       throw new Error(
-        'Unable to resolve hostname; Computer.machineMetadata is undefined'
+        'Unable to resolve hostname; Computer.machineMetadata is null'
       );
     else if (this.machineMetadata.machine_id === null) {
       console.warn(
@@ -461,15 +461,17 @@ export class Computer extends EventEmitter implements IComputer {
   }
 
   /**
-   * Starts an MCP server by invoking the supplied shell command
+   * Starts an MCP server by invoking the supplied shell command. If the server is already running, returns the server's info without starting another instance.
    */
   public async startMcpServer(
     name: string,
     command: string
-  ): Promise<{
-    serverInfo: StartServerResponse | null;
-    error: string | null;
-  }> {
+  ): Promise<StartServerResponse> {
+    if (!this.mcpClient)
+      throw new Error(
+        'MCP Client not connected; have you called Computer.connect()?'
+      );
+
     const url = `${this.getHostname()}/mcp/register_server`;
 
     const request: StartServerRequest = {
@@ -485,21 +487,16 @@ export class Computer extends EventEmitter implements IComputer {
       body: JSON.stringify(request),
     });
 
-    if (!response.ok)
-      return {
-        serverInfo: null,
-        error: `${response.status} ${response.statusText}: ${await response.text()}`,
-      };
+    if (!response.ok) {
+      throw new Error(
+        `${response.status} ${response.statusText}: ${await response.text()}`
+      );
+    }
 
-    const [serverInfo, error] = await (async () => {
-      try {
-        return [StartServerResponseSchema.parse(await response.json()), null];
-      } catch (e) {
-        return [null, `${e}`];
-      }
-    })();
-
-    return { serverInfo, error };
+    const serverInfo = await StartServerResponseSchema.parse(
+      await response.json()
+    );
+    return serverInfo;
   }
 
   public async callMcpTool(

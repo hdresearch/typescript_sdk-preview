@@ -74,22 +74,9 @@ describe('Computer Tests', () => {
     let serverStarted = false;
 
     beforeAll(async () => {
-      const { serverInfo: _serverInfo, error } = await computer.startMcpServer(
-        'kips',
-        'npx kips serve'
-      );
-      if (error || !_serverInfo) {
-        if (error?.includes('already running')) {
-          console.warn(
-            "MCP server 'kips' is already running on the remote machine."
-          );
-          serverStarted = true;
-        } else {
-          throw new Error(`Failed to start MCP server 'kips': ${error}`);
-        }
-      } else {
-        serverStarted = true;
-      }
+      let serverInfo: StartServerResponse;
+      serverInfo = await computer.startMcpServer('kips', 'npx kips serve');
+      serverStarted = true;
     });
 
     it('should start up successfully', () => {
