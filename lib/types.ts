@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import 'dotenv/config';
 import type { BetaMessageParam } from '@anthropic-ai/sdk/resources/beta/index.mjs';
+import { ToolSchema, type Tool } from '@modelcontextprotocol/sdk/types.js';
 
 /**
  * Configuration schema for connecting to the HDR API
@@ -115,20 +116,6 @@ export const MachineMetadata = z.object({
 export type MachineMetadata = z.infer<typeof MachineMetadata>;
 
 /**
- * Interface describing a tool that can be used to interact with the computer
- * @property name - Unique identifier for the tool
- * @property type - Type/version of the tool
- * @property display_height_px - Optional display height for GUI tools
- * @property display_width_px - Optional display width for GUI tools
- */
-export interface ToolI {
-  name: string;
-  type: string;
-  display_height_px?: number;
-  display_width_px?: number;
-}
-
-/**
  * Interface for Claude AI sampling options
  * @property model - Claude model to use
  * @property max_tokens - Maximum tokens in response
@@ -154,3 +141,31 @@ export const defaultSamplingOptions: DefaultSamplingOptions = {
   system: '',
   messages: [],
 };
+
+/**
+ * Contains information required by Vers to spawn a new MCP server.
+ * @property command - The shell command Vers will run to spawn the server (such as `npx` or `uvx`)
+ */
+export interface StartServerRequest {
+  name: string;
+  command: string;
+}
+
+/**
+ * The response returned by Vers when a server is successfully registered.
+ */
+export const StartServerResponseSchema = z.object({
+  tools: z.array(ToolSchema),
+});
+/**
+ * The response returned by Vers when a server is successfully registered.
+ */
+export type StartServerResponse = z.infer<typeof StartServerResponseSchema>;
+
+/**
+ * Represents an MCP server currently running on Vers.
+ */
+export interface McpServer {
+  name: string;
+  tools: Tool[];
+}

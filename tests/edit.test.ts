@@ -1,15 +1,18 @@
 import { describe, beforeAll, afterAll, it, expect } from 'bun:test';
-import { Computer } from '../lib/computer';
+import { Computer, ConnectOptions } from '../lib/computer';
 import { ComputerMessage } from '../lib/types';
 import { join } from 'path';
 import os from 'os';
 import fs from 'fs/promises';
 
-const FILEPATH = join(os.tmpdir(), 'hdr_typescript_sdk_test.txt');
-const FILEPATH_FAKE = join(
-  os.tmpdir(),
-  'hdr_typescript_sdk_does_not_exist.txt'
-);
+const TMPDIR = '/tmp';
+const FILEPATH = join(TMPDIR, 'hdr_typescript_sdk_test.txt');
+const FILEPATH_FAKE = join(TMPDIR, 'hdr_typescript_sdk_does_not_exist.txt');
+
+const TEST_CONNECT_OPTIONS: ConnectOptions = {
+  wsUrl: 'http://localhost:8080/ws',
+  mcpUrl: 'http://localhost:8080/mcp',
+};
 
 describe('Edit tests', () => {
   let computer: Computer;
@@ -17,14 +20,8 @@ describe('Edit tests', () => {
   beforeAll(async () => {
     await cleanTempFiles();
 
-    const baseUrl = process.env.TEST_BASE_URL;
-
-    computer = new Computer({ baseUrl });
-    try {
-      await computer.connect();
-    } catch {
-      throw new Error(`failed to connect to computer at ${baseUrl}`);
-    }
+    computer = new Computer();
+    await computer.connect(TEST_CONNECT_OPTIONS);
   });
 
   afterAll(async () => {
@@ -142,7 +139,7 @@ describe('Edit tests', () => {
     expect(toolResult.tool_result.error).toBeString();
 
     // Try to undo edit on non-existent file
-    // Note that if previous tests fail (and do create a file), the Hudson instance can be "poisoned" with its undo history and may have to be restarted before this test will succeed.
+    // Note that if previous tests fail (and do create a file), the Vers instance can be "poisoned" with its undo history and may have to be restarted before this test will succeed.
     console.log('=== undo_edit ===');
     toolResult = await computer.execute({
       tool: 'str_replace_editor',

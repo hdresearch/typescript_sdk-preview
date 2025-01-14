@@ -25,3 +25,18 @@ export function getWSSUrl(baseURL: string): string {
 export function getStreamUrl(baseURL: string, machineId: string): string {
   return `${baseURL}/compute/${machineId}/stream`;
 }
+
+/**
+ * Constructs a Model Context Protocol (MCP) URL by combining the base URL and machine ID
+ * @param {string} baseURL - The base URL of the API
+ * @param {string} machineId - The ID of the machine to connect to
+ * @returns {string} The complete MCP URL
+ * @throws {Error} If machineId is null
+ * @example
+ * getMCPUrl('https://api.hdr.is', '123abc') // Returns 'https://api.hdr.is/compute/123abc/mcp'
+ */
+export function getMcpUrl(baseURL: string, machineId: string | null): string {
+  if (machineId === null)
+    throw new Error('Unable to get MCP Url: machineId is null.');
+  return `${baseURL}/compute/${machineId}/mcp`;
+}

@@ -3,7 +3,9 @@ import {
   ComputerMessage,
   HDRConfig,
   MachineMetadata,
-  type ToolI,
+  StartServerResponseSchema,
+  type StartServerRequest,
+  type StartServerResponse,
 } from './types';
 
 import { bashTool, computerTool } from './tools';
@@ -12,7 +14,32 @@ import { createModuleLogger } from './utils/logger';
 import { EventEmitter } from 'events';
 import { Action } from './schemas/action';
 import { useComputer } from './anthropic';
-import { getStreamUrl, getWSSUrl } from './utils/urls';
+import {
+  Client,
+  type ClientOptions,
+} from '@modelcontextprotocol/sdk/client/index.js';
+import { VERSION, MCP_CLIENT_NAME } from './constants';
+import type {
+  CallToolRequest,
+  CallToolResultSchema,
+  CompatibilityCallToolResultSchema,
+  Implementation,
+  ServerCapabilities,
+} from '@modelcontextprotocol/sdk/types.js';
+import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
+import type { RequestOptions } from '@modelcontextprotocol/sdk/shared/protocol.js';
+import type {
+  BetaToolUnion,
+  BetaTool,
+} from '@anthropic-ai/sdk/resources/beta/index.mjs';
+
+// Polyfill is a workaround required by MCP SDK  - asebexen
+// Solution taken from https://github.com/pocketbase/pocketbase/discussions/3285
+import { EventSource } from 'eventsource';
+global.EventSource = EventSource;
+
+const EVENT_METADATA_READY = 'machine-metadata-ready';
+import { getMcpUrl as getMcpUrl, getStreamUrl, getWSSUrl } from './utils/urls';
 
 const logger = createModuleLogger('Computer');
 
@@ -29,15 +56,25 @@ export interface IComputer {
 }
 
 /**
+ * Options that may be passed to Computer.connect()
+ */
+export interface ConnectOptions {
+  /** Override the default WS URL, which is derived from Computer.options */
+  wsUrl?: string;
+  /** Override the default MCP URL, which is derived from Computer.options */
+  mcpUrl?: string;
+}
+
+/**
  * Configuration options for the Computer instance
  */
 export interface ComputerOptions {
-  /** Base WebSocket URL for the server */
+  /** Vers Server base URL */
   baseUrl?: string;
   /** HDR API key for authentication */
   apiKey?: string;
   /** Set of available tools for computer control */
-  tools?: Set<ToolI>;
+  tools?: Set<BetaToolUnion>;
   logOutput?: boolean;
   /** Callback function for handling incoming messages */
   onMessage: (message: ComputerMessage) => void | Promise<void>;
@@ -70,7 +107,15 @@ const defaultOptions: ComputerOptions = {
 };
 
 /**
- * Main class for managing computer control operations through WebSocket
+ * Metadata for the MCP client
+ */
+const mcpClientInfo: Implementation = {
+  name: MCP_CLIENT_NAME,
+  version: VERSION,
+};
+
+/**
+ * Main class for managing computer control operations through WebSocket, as well as MCP operations
  * @extends EventEmitter
  * @implements IComputer
  */
@@ -78,12 +123,13 @@ export class Computer extends EventEmitter implements IComputer {
   private config: HDRConfig;
   private options: ComputerOptions;
   private ws: WebSocket | null = null;
+  private mcpClient: Client | null = null;
   private logger: ComputerLogger;
   createdAt: string;
   updatedAt: string | null = null;
   sessionId: string | null = null;
-  machineMetadata: MachineMetadata | null = null;
-  tools: Set<ToolI> = new Set();
+  /** Use Computer.getMetadata() to get - metadata is set on connect() invocation via welcome message */
+  private machineMetadata: MachineMetadata | null = null;
 
   /**
    * Creates a new Computer instance
@@ -93,8 +139,8 @@ export class Computer extends EventEmitter implements IComputer {
     super();
     this.options = { ...defaultOptions, ...options };
     this.config = HDRConfig.parse({
-      base_url: options.baseUrl,
-      api_key: options.apiKey,
+      base_url: this.options.baseUrl,
+      api_key: this.options.apiKey,
     });
     this.logger = new ComputerLogger();
     this.createdAt = new Date().toISOString();
@@ -191,18 +237,29 @@ export class Computer extends EventEmitter implements IComputer {
 
       this.options.tools?.delete(computerTool);
       this.options.tools?.add(updatedComputerTool);
+
+      this.emit(EVENT_METADATA_READY);
     }
   }
 
   /**
-   * Establishes WebSocket connection
-   * @returns {Promise<void>}
+   * Establishes WebSocket and SSE (MCP) connection, optionally overriding default connection URLs
+   * @returns {Promise<void[]>}
    */
-  public async connect(): Promise<void> {
-    return new Promise((resolve, reject) => {
-      const wssUrl = getWSSUrl(this.config.base_url);
-      logger.info(`Connecting to ${wssUrl}`);
-      this.ws = new WebSocket(wssUrl, {
+  public async connect(options?: ConnectOptions): Promise<void> {
+    await this.connectWS(options?.wsUrl);
+    await this.connectMcpClient(options?.mcpUrl);
+  }
+
+  /**
+   * Establish WebSocket connection
+   * @private
+   */
+  private async connectWS(url?: string): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
+      const wsUrl = url || getWSSUrl(this.config.base_url);
+      logger.info(`Connecting to ${wsUrl}`);
+      this.ws = new WebSocket(wsUrl, {
         headers: { Authorization: `Bearer ${this.config.api_key}` },
       });
 
@@ -228,12 +285,47 @@ export class Computer extends EventEmitter implements IComputer {
   }
 
   /**
+   * Establish MCP Client connection
+   * @private
+   */
+  private async connectMcpClient(url?: string): Promise<void> {
+    const options: ClientOptions = {
+      capabilities: {},
+    };
+    this.mcpClient = new Client(mcpClientInfo, options);
+
+    const metadata = await this.getMetadata();
+    const mcpUrl = url || getMcpUrl(this.config.base_url, metadata.machine_id);
+    const transport = new SSEClientTransport(new URL(mcpUrl));
+
+    await this.mcpClient.connect(transport);
+  }
+
+  /**
+   * Returns the hostname of the machine, based on the machine_id received in the welcome message.
+   * @private
+   */
+  private getHostname(): string {
+    if (!this.machineMetadata)
+      throw new Error(
+        'Unable to resolve hostname; Computer.machineMetadata is null'
+      );
+    else if (this.machineMetadata.machine_id === null) {
+      console.warn(
+        'Remote machine returned a null machine_id; unless this is intentional, this should be regarded as a server-side error'
+      );
+      return 'http://localhost:8080';
+    } else
+      return `https://api.hdr.is/compute/${this.machineMetadata.machine_id}`;
+  }
+
+  /**
    * Sends data through WebSocket connection
    * @param {Action} data - Action to be sent
    * @returns {Promise<void>}
    * @private
    */
-  private async send(data: Action): Promise<void> {
+  private async sendWS(data: Action): Promise<void> {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
       throw new Error('WebSocket is not connected');
     }
@@ -265,7 +357,7 @@ export class Computer extends EventEmitter implements IComputer {
       };
 
       this.addListener('message', handleMessage);
-      this.send(command);
+      this.sendWS(command);
     });
   }
 
@@ -341,36 +433,169 @@ export class Computer extends EventEmitter implements IComputer {
 
   /**
    * Registers new tools for computer control
-   * @param {ToolI[]} tools - Array of tools to register
+   * @param {BetaToolUnion[]} tools - Array of tools to register
    */
-  public registerTool(tools: ToolI[]) {
+  public registerTool(tools: BetaToolUnion[]) {
     tools.forEach((tool) => {
       this.options.tools?.add(tool);
     });
   }
 
   /**
-   * Lists all registered tools
-   * @returns {ToolI[]} Array of registered tools
+   * Lists all registered computer use tools
+   * @returns {BetaToolUnion[]} Array of registered computer use tools
    */
-  public listTools(): ToolI[] {
+  public listComputerUseTools(): BetaToolUnion[] {
     return Array.from(this.options.tools ?? new Set());
+  }
+
+  /**
+   * Starts an MCP server by invoking the supplied shell command. If the server is already running, returns the server's info without starting another instance.
+   */
+  public async startMcpServer(
+    name: string,
+    command: string
+  ): Promise<StartServerResponse> {
+    if (!this.mcpClient)
+      throw new Error(
+        'MCP Client not connected; have you called Computer.connect()?'
+      );
+
+    const url = `${this.getHostname()}/mcp/register_server`;
+
+    const request: StartServerRequest = {
+      name,
+      command,
+    };
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(request),
+    });
+
+    if (!response.ok) {
+      throw new Error(
+        `${response.status} ${response.statusText}: ${await response.text()}`
+      );
+    }
+
+    const serverInfo = await StartServerResponseSchema.parse(
+      await response.json()
+    );
+    return serverInfo;
+  }
+
+  public async callMcpTool(
+    name: string,
+    args?: Record<string, unknown>,
+    resultSchema?:
+      | typeof CallToolResultSchema
+      | typeof CompatibilityCallToolResultSchema,
+    options?: RequestOptions
+  ) {
+    if (!this.mcpClient)
+      throw new Error(
+        'MCP Client not connected; have you called Computer.connect()?'
+      );
+    const params: CallToolRequest['params'] = {
+      name,
+      arguments: args,
+    };
+
+    return this.mcpClient.callTool(params, resultSchema, options);
+  }
+
+  /**
+   * @returns a list of tools exposed by all currently-running MCP servers
+   */
+  public async listMcpTools(): Promise<BetaTool[]> {
+    if (!this.mcpClient)
+      throw new Error(
+        'MCP Client not connected; have you called Computer.connect()?'
+      );
+    return this.mcpClient.listTools().then((x) =>
+      x.tools.map((tool) => {
+        const { inputSchema, ...rest } = tool;
+        const betaTool: BetaTool = {
+          ...rest,
+          input_schema: inputSchema,
+        };
+        return betaTool;
+      })
+    );
+  }
+
+  public async getMcpServerCapabilities(): Promise<
+    ServerCapabilities | undefined
+  > {
+    if (!this.mcpClient)
+      throw new Error(
+        'MCP Client not connected; have you called Computer.connect()?'
+      );
+    return this.mcpClient.getServerCapabilities();
+  }
+
+  public async getMcpServerVersion(): Promise<Implementation | undefined> {
+    if (!this.mcpClient)
+      throw new Error(
+        'MCP Client not connected; have you called Computer.connect()?'
+      );
+    return this.mcpClient.getServerVersion();
+  }
+
+  public async mcpPing() {
+    if (!this.mcpClient)
+      throw new Error(
+        'MCP Client not connected; have you called Computer.connect()?'
+      );
+    return this.mcpClient.ping();
+  }
+
+  /**
+   * @returns a list of all tools, both computer use and MCP.
+   */
+  public async listAllTools(): Promise<BetaToolUnion[]> {
+    return [...this.listComputerUseTools(), ...(await this.listMcpTools())];
   }
 
   /**
    * Waits for machine metadata to be available
    * @param {number} timeoutMs - Maximum time to wait in milliseconds (default: 10000)
    * @throws {Error} If metadata is not available within timeout period
-   * @private
+   * @public
    */
-  private async waitForMetadata(timeoutMs: number = 10000): Promise<void> {
-    const startTime = Date.now();
-    while (!this.machineMetadata) {
-      if (Date.now() - startTime > timeoutMs) {
-        throw new Error('Timeout waiting for machine metadata');
+  public async getMetadata(
+    timeoutMs: number = 10000
+  ): Promise<MachineMetadata> {
+    return new Promise<MachineMetadata>((resolve, reject) => {
+      if (this.machineMetadata) {
+        resolve(this.machineMetadata);
       }
-      await new Promise((resolve) => setTimeout(resolve, 100));
-    }
+
+      const timeoutHandle = setTimeout(
+        () => reject('Timed out while waiting for welcome message'),
+        timeoutMs
+      );
+
+      const cleanup = () => {
+        clearTimeout(timeoutHandle);
+        this.removeListener(EVENT_METADATA_READY, onReady);
+      };
+
+      const onReady = () => {
+        cleanup();
+        if (!this.machineMetadata)
+          throw new Error(
+            `Computer emitted '${EVENT_METADATA_READY}' but metadata is not ready.`
+          );
+        resolve(this.machineMetadata);
+      };
+
+      this.on(EVENT_METADATA_READY, onReady);
+    });
   }
   /**
    * Gets the URL for streaming video from the connected computer
@@ -382,11 +607,12 @@ export class Computer extends EventEmitter implements IComputer {
       throw new Error('Computer is not connected.');
     }
 
-    await this.waitForMetadata();
+    const machineMetadata = await this.getMetadata();
+    if (!machineMetadata.machine_id)
+      throw new Error(
+        'Failed to get video stream URL; machine does not have a machine ID'
+      );
 
-    return getStreamUrl(
-      this.config.base_url,
-      this.machineMetadata!.machine_id!
-    );
+    return getStreamUrl(this.config.base_url, machineMetadata.machine_id);
   }
 }

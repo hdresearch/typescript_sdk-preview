@@ -1,13 +1,17 @@
-import type { ToolI } from './types';
 import { ToolResult } from './types';
-import type { BetaToolResultBlockParam } from '@anthropic-ai/sdk/resources/beta/index.mjs';
+import type {
+  BetaToolBash20241022,
+  BetaToolComputerUse20241022,
+  BetaToolResultBlockParam,
+  BetaToolTextEditor20241022,
+} from '@anthropic-ai/sdk/resources/beta/index.mjs';
 
-export const bashTool: ToolI = {
+export const bashTool: BetaToolBash20241022 = {
   name: 'bash',
   type: 'bash_20241022',
 };
 
-export const computerTool: ToolI = {
+export const computerTool: BetaToolComputerUse20241022 = {
   name: 'computer',
   type: 'computer_20241022',
   // Default display dimensions. Will be updated by the server on connection.
@@ -15,7 +19,7 @@ export const computerTool: ToolI = {
   display_width_px: 1024,
 };
 
-export const editTool: ToolI = {
+export const editTool: BetaToolTextEditor20241022 = {
   name: 'str_replace_editor',
   type: 'text_editor_20241022',
 };
