@@ -15,6 +15,18 @@ A TypeScript library for programmatic control of remote computers via WebSocket 
 - Type-safe with Zod schema validation
 - Event-driven architecture
 
+## Model Context Protocol (MCP) Support
+
+This library implements the Model Context Protocol (MCP) specification, allowing for standardized communication between language models and computer control interfaces. Key MCP features include:
+
+- Full compliance with MCP server specifications
+- Structured message format for model-computer interactions
+- Support for both synchronous and asynchronous operations
+- Standardized error handling and status reporting
+- Built-in support for context preservation across interactions
+
+The library can connect to any MCP-compliant server, enabling consistent behavior across different model providers and computer control implementations.
+
 ## Installation
 
 ```bash

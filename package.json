@@ -2,7 +2,7 @@
   "name": "@hdr/sdk-preview",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
-  "version": "0.1.1",
+  "version": "0.3.1",
   "files": [
     "dist"
   ],
