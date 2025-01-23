@@ -5,15 +5,7 @@ const logger = pino({
   base: {
     env: process.env.NODE_ENV || 'development',
   },
-  transport: {
-    target: 'pino-pretty',
-    options: {
-      translateTime: 'HH:MM:ss Z',
-      ignore: 'pid,hostname',
-      colorize: true,
-      levelFirst: true,
-    },
-  },
+  // Remove the transport config to avoid worker threads
 });
 
 // Create child loggers for different modules
