@@ -38,5 +38,5 @@ export function getStreamUrl(baseURL: string, machineId: string): string {
 export function getMcpUrl(baseURL: string, machineId: string | null): string {
   if (machineId === null)
     throw new Error('Unable to get MCP Url: machineId is null.');
-  return `${baseURL}/compute/${machineId}/mcp`;
+  return `${baseURL}${machineId}/mcp`;
 }

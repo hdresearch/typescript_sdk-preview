@@ -1,5 +1,12 @@
-import fs from 'fs';
-import path from 'path';
+import {
+  mkdirSync,
+  appendFileSync,
+  writeFileSync,
+  readdirSync,
+  unlinkSync,
+  rmdirSync,
+} from 'node:fs';
+import { join } from 'node:path';
 import {
   LogConfig,
   type ComputerMessage,
@@ -39,12 +46,12 @@ export class ComputerLogger {
     const parsedOptions = LogConfig.parse(options);
     this.logDir = parsedOptions.logDir;
     this.conversationFile = 'conversation.jsonl';
-    this.runDir = path.join(this.logDir, parsedOptions.runDir);
+    this.runDir = join(this.logDir, parsedOptions.runDir);
     logger.debug(`Creating run directory: ${this.runDir}`);
-    this.conversationLogFile = path.join(this.runDir, this.conversationFile);
+    this.conversationLogFile = join(this.runDir, this.conversationFile);
 
-    fs.mkdirSync(this.logDir, { recursive: true });
-    fs.mkdirSync(this.runDir, { recursive: true });
+    mkdirSync(this.logDir, { recursive: true });
+    mkdirSync(this.runDir, { recursive: true });
   }
 
   /**
@@ -52,7 +59,7 @@ export class ComputerLogger {
    * @param command - The command action to log
    */
   public logSend(command: Action): void {
-    fs.appendFileSync(this.conversationLogFile, JSON.stringify(command) + '\n');
+    appendFileSync(this.conversationLogFile, JSON.stringify(command) + '\n');
   }
 
   /**
@@ -69,7 +76,7 @@ export class ComputerLogger {
     }
     messageDict.tool_result.base64_image = null;
 
-    fs.appendFileSync(
+    appendFileSync(
       this.conversationLogFile,
       JSON.stringify(messageDict) + '\n'
     );
@@ -84,16 +91,13 @@ export class ComputerLogger {
   private logScreenshot(message: ComputerMessage): string | null {
     if (message.tool_result.base64_image) {
       const timestamp = message.metadata.request_timestamp.toISOString();
-      const screenshot_file = path.join(
-        this.runDir,
-        `screenshot_${timestamp}.png`
-      );
+      const screenshot_file = join(this.runDir, `screenshot_${timestamp}.png`);
       logger.debug(`Logging screenshot to: ${screenshot_file}`);
       const imageBuffer = Buffer.from(
         message.tool_result.base64_image,
         'base64'
       );
-      fs.writeFileSync(screenshot_file, new Uint8Array(imageBuffer));
+      writeFileSync(screenshot_file, new Uint8Array(imageBuffer));
       return screenshot_file;
     }
     return null;
@@ -104,9 +108,9 @@ export class ComputerLogger {
    */
   public cleanup(): void {
     logger.debug(`Cleaning up run directory: ${this.runDir}`);
-    fs.readdirSync(this.runDir).forEach((file) => {
-      fs.unlinkSync(path.join(this.runDir, file));
+    readdirSync(this.runDir).forEach((file) => {
+      unlinkSync(join(this.runDir, file));
     });
-    fs.rmdirSync(this.runDir);
+    rmdirSync(this.runDir);
   }
 }
