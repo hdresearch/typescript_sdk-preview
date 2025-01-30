@@ -127,6 +127,7 @@ export async function useComputer(
     } else {
       break;
     }
+    return messages;
   }
 
   // Clean up and log completion

@@ -31,6 +31,7 @@ import type { RequestOptions } from '@modelcontextprotocol/sdk/shared/protocol.j
 import type {
   BetaToolUnion,
   BetaTool,
+  BetaMessageParam,
 } from '@anthropic-ai/sdk/resources/beta/index.mjs';
 
 // Polyfill is a workaround required by MCP SDK  - asebexen
@@ -97,10 +98,10 @@ const defaultOptions: ComputerOptions = {
   baseUrl: process.env.HDR_BASE_URL || 'https://api.hdr.is/compute/',
   tools: new Set([bashTool, computerTool]),
   logOutput: true,
-  onOpen: () => {},
-  onMessage: () => {},
-  onError: () => {},
-  onClose: () => {},
+  onOpen: () => { },
+  onMessage: () => { },
+  onError: () => { },
+  onClose: () => { },
   parseMessage: (message: MessageEvent) => {
     return ComputerMessage.parse(JSON.parse(message.toString()));
   },
@@ -370,13 +371,14 @@ export class Computer extends EventEmitter implements IComputer {
   public async do(
     objective: string,
     provider: 'anthropic' | 'custom' = 'anthropic'
-  ): Promise<void> {
+  ): Promise<BetaMessageParam[] | null> {
     if (provider === 'custom') {
       throw new Error(
         'Custom providers are not supported for this method. Use the execute method instead.'
       );
     }
-    await useComputer(objective, this);
+    const messages = await useComputer(objective, this);
+    return messages || null;
   }
 
   /**
