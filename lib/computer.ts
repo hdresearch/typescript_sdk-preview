@@ -1,4 +1,5 @@
 import { WebSocket, type MessageEvent } from 'ws';
+import { readFile } from 'fs/promises';
 import {
   ComputerMessage,
   HDRConfig,
@@ -39,7 +40,12 @@ import { EventSource } from 'eventsource';
 global.EventSource = EventSource;
 
 const EVENT_METADATA_READY = 'machine-metadata-ready';
-import { getMcpUrl as getMcpUrl, getStreamUrl, getWSSUrl } from './utils/urls';
+import {
+  getFileUrl,
+  getMcpUrl as getMcpUrl,
+  getStreamUrl,
+  getWSSUrl,
+} from './utils/urls';
 
 const logger = createModuleLogger('Computer');
 
@@ -614,5 +620,30 @@ export class Computer extends EventEmitter implements IComputer {
       );
 
     return getStreamUrl(this.config.base_url, machineMetadata.machine_id);
+  }
+
+  public async putFile(path: string) {
+    const machineMetadata = await this.getMetadata();
+    const url = getFileUrl(this.config.base_url, machineMetadata.machine_id);
+
+    const file = await readFile(path);
+    const formData = new FormData();
+    const filename = path.split('/').pop();
+    formData.append('file', new Blob([file]), filename);
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${this.config.api_key}`,
+      },
+      body: formData,
+    });
+
+    if (!response.ok) {
+      throw new Error(
+        `${response.status} ${response.statusText}: ${await response.text()}`
+      );
+    }
+
+    return response;
   }
 }
