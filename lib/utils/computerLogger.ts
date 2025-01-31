@@ -4,9 +4,9 @@ import {
   LogConfig,
   type ComputerMessage,
   type ComputerMessageLog,
-} from '../types';
-import { createModuleLogger } from './logger';
-import type { Action } from '../schemas/action';
+} from '../types.js';
+import { createModuleLogger } from './logger.js';
+import type { Action } from '../schemas/action.js';
 
 const logger = createModuleLogger('ComputerLogger');
 

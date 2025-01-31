@@ -10,7 +10,7 @@
 
     // Bundler mode
     "moduleResolution": "bundler",
-    "allowImportingTsExtensions": true,
+    "allowImportingTsExtensions": false,
     "verbatimModuleSyntax": true,
     "noEmit": false,
 
@@ -26,7 +26,7 @@
 
     "declaration": true,
     "declarationDir": "./dist",
-    "emitDeclarationOnly": true
+    "emitDeclarationOnly": false
   },
   "include": ["lib/**/*"],
   "exclude": ["node_modules", "tests", "quickstart"]

@@ -1,4 +1,4 @@
-import { ToolResult } from './types';
+import { ToolResult } from './types.js';
 import type {
   BetaToolBash20241022,
   BetaToolComputerUse20241022,

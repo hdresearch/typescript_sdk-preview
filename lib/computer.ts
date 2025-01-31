@@ -6,19 +6,19 @@ import {
   StartServerResponseSchema,
   type StartServerRequest,
   type StartServerResponse,
-} from './types';
+} from './types.js';
 
-import { bashTool, computerTool } from './tools';
-import { ComputerLogger } from './utils/computerLogger';
-import { createModuleLogger } from './utils/logger';
+import { bashTool, computerTool } from './tools.js';
+import { ComputerLogger } from './utils/computerLogger.js';
+import { createModuleLogger } from './utils/logger.js';
 import { EventEmitter } from 'events';
-import { Action } from './schemas/action';
-import { useComputer } from './anthropic';
+import { Action } from './schemas/action.js';
+import { useComputer } from './anthropic.js';
 import {
   Client,
   type ClientOptions,
 } from '@modelcontextprotocol/sdk/client/index.js';
-import { VERSION, MCP_CLIENT_NAME } from './constants';
+import { VERSION, MCP_CLIENT_NAME } from './constants.js';
 import type {
   CallToolRequest,
   CallToolResultSchema,
@@ -39,7 +39,11 @@ import { EventSource } from 'eventsource';
 global.EventSource = EventSource;
 
 const EVENT_METADATA_READY = 'machine-metadata-ready';
-import { getMcpUrl as getMcpUrl, getStreamUrl, getWSSUrl } from './utils/urls';
+import {
+  getMcpUrl as getMcpUrl,
+  getStreamUrl,
+  getWSSUrl,
+} from './utils/urls.js';
 
 const logger = createModuleLogger('Computer');
 
@@ -261,6 +265,8 @@ export class Computer extends EventEmitter implements IComputer {
       logger.info(`Connecting to ${wsUrl}`);
       this.ws = new WebSocket(wsUrl, {
         headers: { Authorization: `Bearer ${this.config.api_key}` },
+        handshakeTimeout: 5000,
+        perMessageDeflate: false,
       });
 
       this.ws.on('open', () => {
@@ -281,6 +287,20 @@ export class Computer extends EventEmitter implements IComputer {
         this.emit('close', code, reason);
         reject(new Error(`Connection closed: ${code} ${reason}`));
       });
+      this.ws.on('upgrade', (res) => logger.debug('WS Upgrade:', res));
+      this.ws.on('ping', () => logger.debug('WS Ping'));
+      this.ws.on('pong', () => logger.debug('WS Pong'));
+      this.ws.on('unexpected-response', (req, res) =>
+        logger.error('WS Unexpected:', res.statusCode)
+      );
+
+      // State changes
+      const states = ['CONNECTING', 'OPEN', 'CLOSING', 'CLOSED'];
+      setInterval(() => {
+        if (this.ws) {
+          logger.debug(`WS State: ${states[this.ws.readyState]}`);
+        }
+      }, 1000);
     });
   }
 

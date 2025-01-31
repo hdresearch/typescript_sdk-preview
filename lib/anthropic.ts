@@ -7,17 +7,17 @@ import type {
   BetaToolResultBlockParam,
   BetaToolUseBlock,
 } from '@anthropic-ai/sdk/resources/beta/index.mjs';
-import { Computer } from '../lib';
-import { Action } from '../lib/schemas/action';
+import { Computer } from './computer.js';
+import { Action } from './schemas/action.js';
 import {
   defaultSamplingOptions,
   MachineMetadata,
   type DefaultSamplingOptions,
-} from '../lib/types';
-import { logger } from '../lib/utils/logger';
-import { makeToolResult } from './tools';
-import { ToolResult } from '../lib/types';
-import { UnknownAction } from './schemas/unknownAction';
+} from './types.js';
+import { logger } from './utils/logger.js';
+import { makeToolResult } from './tools.js';
+import { ToolResult } from './types.js';
+import { UnknownAction } from './schemas/unknownAction.js';
 import type { ToolResultBlockParam } from '@anthropic-ai/sdk/resources/index.mjs';
 
 function systemCapability(machineMetadata: MachineMetadata) {

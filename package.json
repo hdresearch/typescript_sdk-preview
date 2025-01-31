@@ -21,7 +21,7 @@
   "devDependencies": {
     "@eslint/js": "^9.16.0",
     "@trivago/prettier-plugin-sort-imports": "^5.1.0",
-    "@types/bun": "latest",
+    "@types/ws": "^8.5.14",
     "eslint": "^9.16.0",
     "eslint-config-prettier": "^9.1.0",
     "eslint-plugin-prettier": "^5.2.1",
@@ -46,7 +46,7 @@
     ]
   },
   "scripts": {
-    "build": "bun build ./lib/index.ts --outdir ./dist --target node --format esm && mv ./dist/index.js ./dist/index.mjs && tsc --emitDeclarationOnly --outDir dist",
+    "build": "tsc --outDir dist",
     "format": "prettier --write \"**/*.{js,jsx,ts,tsx,json,css,scss,md}\"",
     "format:check": "prettier --check \"**/*.{js,jsx,ts,tsx,json,css,scss,md}\"",
     "lint": "eslint ./lib",

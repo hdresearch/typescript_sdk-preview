@@ -1,4 +1,4 @@
-import { ComputerLogger } from './computerLogger';
-import { logger, createModuleLogger } from './logger';
+import { ComputerLogger } from './computerLogger.js';
+import { logger, createModuleLogger } from './logger.js';
 
 export { ComputerLogger, logger, createModuleLogger };

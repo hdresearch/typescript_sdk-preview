@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import { BashAction } from './bashAction';
-import { ComputerAction } from './computerActions';
-import { EditAction } from './editActions';
+import { BashAction } from './bashAction.js';
+import { ComputerAction } from './computerActions.js';
+import { EditAction } from './editActions.js';
 
 /**
  * Union type representing all possible actions that can be executed
