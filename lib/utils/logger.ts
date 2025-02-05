@@ -1,4 +1,4 @@
-import type { BetaToolResultBlockParam } from '@anthropic-ai/sdk/resources/beta/index.mjs';
+import type { BetaContentBlockParam, BetaToolResultBlockParam } from '@anthropic-ai/sdk/resources/beta/index.mjs';
 import pino from 'pino';
 
 const logger = pino({
@@ -34,5 +34,4 @@ export const cleanLogs = (toolResult: BetaToolResultBlockParam) => {
       )
       : toolResult.content
   }
-
 }

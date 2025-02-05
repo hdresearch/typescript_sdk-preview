@@ -32,7 +32,6 @@ import type { RequestOptions } from '@modelcontextprotocol/sdk/shared/protocol.j
 import type {
   BetaToolUnion,
   BetaTool,
-  BetaMessageParam,
 } from '@anthropic-ai/sdk/resources/beta/index.mjs';
 
 // Polyfill is a workaround required by MCP SDK  - asebexen
@@ -377,7 +376,7 @@ export class Computer extends EventEmitter implements IComputer {
   public async do(
     objective: string,
     provider: 'anthropic' | 'custom' = 'anthropic'
-  ): Promise<string | null> {
+  ): Promise<any | null> {
     if (provider === 'custom') {
       throw new Error(
         'Custom providers are not supported for this method. Use the execute method instead.'

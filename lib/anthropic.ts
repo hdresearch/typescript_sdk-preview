@@ -132,7 +132,15 @@ export async function useComputer(
 
   // Clean up and log completion
   logger.info({ task }, 'Completed task: ');
-  return messages.toString();
+  const cleanedMessages = messages.map(message => {
+    return Array.isArray(message.content)
+      ? message.content.map(c =>
+        c.type === 'image' ? { ...c, source: { ...c.source, data: '[base64 data omitted]' } } : c
+      ) :
+      message.content
+  })
+
+  return cleanedMessages;
 
 }
 
