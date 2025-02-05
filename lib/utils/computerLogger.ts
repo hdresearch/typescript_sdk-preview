@@ -68,17 +68,25 @@ export class ComputerLogger {
    * @param message - The message response to log
    */
   public logReceive(message: ComputerMessage): void {
-    logger.debug(`Logging message: ${JSON.stringify(message)}`);
+    const messageForLogging: ComputerMessageLog = {
+      ...message,
+      tool_result: {
+        ...message.tool_result,
+        base64_image: message.tool_result.base64_image ? '[base64 image data]' : null
+      }
+    };
+
+    logger.debug(`Logging message: ${JSON.stringify(messageForLogging)}`);
+
     const screenshot_file = this.logScreenshot(message);
-    const messageDict: ComputerMessageLog = { ...message };
+
     if (screenshot_file) {
-      messageDict.screenshot_file = screenshot_file;
+      messageForLogging.screenshot_file = screenshot_file;
     }
-    messageDict.tool_result.base64_image = null;
 
     appendFileSync(
       this.conversationLogFile,
-      JSON.stringify(messageDict) + '\n'
+      JSON.stringify(messageForLogging) + '\n'
     );
   }
 
