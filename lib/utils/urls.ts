@@ -45,5 +45,5 @@ export function getFileUrl(baseURL: string, machineId: string | null): string {
   if (machineId === null) {
     throw new Error('Unable to get File Url: machineId is null.');
   }
-  return `${baseURL}${machineId}/file/upload`;
+  return `${baseURL}${machineId}/file/file/upload`;
 }
