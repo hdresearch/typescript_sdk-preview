@@ -14,7 +14,7 @@ import {
   MachineMetadata,
   type DefaultSamplingOptions,
 } from '../lib/types';
-import { logger } from '../lib/utils/logger';
+import { logger, cleanToolResult, cleanMessage } from '../lib/utils/logger';
 import { makeToolResult } from './tools';
 import { ToolResult } from '../lib/types';
 import { UnknownAction } from './schemas/unknownAction';
@@ -129,8 +129,14 @@ export async function useComputer(
     }
   }
 
+
+
   // Clean up and log completion
   logger.info({ task }, 'Completed task: ');
+  const cleanedMessages = messages.map(cleanMessage)
+
+  return cleanedMessages;
+
 }
 
 /**
@@ -196,9 +202,8 @@ async function handleToolRequest(block: BetaToolUseBlock, computer: Computer) {
   })();
 
   if (execute) {
-    // Execute the tool request and store result
     const toolResult = await execute();
-    logger.info(toolResult, 'Tool Result:');
+    logger.info(cleanToolResult(toolResult), 'Tool Result:');
     toolResults.push(toolResult);
   }
 

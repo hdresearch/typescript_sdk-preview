@@ -40,3 +40,10 @@ export function getMcpUrl(baseURL: string, machineId: string | null): string {
     throw new Error('Unable to get MCP Url: machineId is null.');
   return `${baseURL}${machineId}/mcp`;
 }
+
+export function getFileUrl(baseURL: string, machineId: string | null): string {
+  if (machineId === null) {
+    throw new Error('Unable to get File Url: machineId is null.');
+  }
+  return `${baseURL}${machineId}/file/file/upload`;
+}

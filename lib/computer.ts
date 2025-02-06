@@ -1,4 +1,5 @@
 import { WebSocket, type MessageEvent } from 'ws';
+import { readFile } from 'fs/promises';
 import {
   ComputerMessage,
   HDRConfig,
@@ -39,7 +40,12 @@ import { EventSource } from 'eventsource';
 global.EventSource = EventSource;
 
 const EVENT_METADATA_READY = 'machine-metadata-ready';
-import { getMcpUrl as getMcpUrl, getStreamUrl, getWSSUrl } from './utils/urls';
+import {
+  getFileUrl,
+  getMcpUrl as getMcpUrl,
+  getStreamUrl,
+  getWSSUrl,
+} from './utils/urls';
 
 const logger = createModuleLogger('Computer');
 
@@ -97,10 +103,10 @@ const defaultOptions: ComputerOptions = {
   baseUrl: process.env.HDR_BASE_URL || 'https://api.hdr.is/compute/',
   tools: new Set([bashTool, computerTool]),
   logOutput: true,
-  onOpen: () => {},
-  onMessage: () => {},
-  onError: () => {},
-  onClose: () => {},
+  onOpen: () => { },
+  onMessage: () => { },
+  onError: () => { },
+  onClose: () => { },
   parseMessage: (message: MessageEvent) => {
     return ComputerMessage.parse(JSON.parse(message.toString()));
   },
@@ -370,13 +376,14 @@ export class Computer extends EventEmitter implements IComputer {
   public async do(
     objective: string,
     provider: 'anthropic' | 'custom' = 'anthropic'
-  ): Promise<void> {
+  ): Promise<any | null> {
     if (provider === 'custom') {
       throw new Error(
         'Custom providers are not supported for this method. Use the execute method instead.'
       );
     }
-    await useComputer(objective, this);
+    const messages = await useComputer(objective, this);
+    return messages || null;
   }
 
   /**
@@ -614,5 +621,30 @@ export class Computer extends EventEmitter implements IComputer {
       );
 
     return getStreamUrl(this.config.base_url, machineMetadata.machine_id);
+  }
+
+  public async putFile(path: string) {
+    const machineMetadata = await this.getMetadata();
+    const url = getFileUrl(this.config.base_url, machineMetadata.machine_id);
+
+    const file = await readFile(path);
+    const formData = new FormData();
+    const filename = path.split('/').pop();
+    formData.append('file', new Blob([file]), filename);
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${this.config.api_key}`,
+      },
+      body: formData,
+    });
+
+    if (!response.ok) {
+      throw new Error(
+        `${response.status} ${response.statusText}: ${await response.text()}`
+      );
+    }
+
+    return response;
   }
 }
