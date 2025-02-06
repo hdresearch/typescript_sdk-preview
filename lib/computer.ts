@@ -103,10 +103,10 @@ const defaultOptions: ComputerOptions = {
   baseUrl: process.env.HDR_BASE_URL || 'https://api.hdr.is/compute/',
   tools: new Set([bashTool, computerTool]),
   logOutput: true,
-  onOpen: () => {},
-  onMessage: () => {},
-  onError: () => {},
-  onClose: () => {},
+  onOpen: () => { },
+  onMessage: () => { },
+  onError: () => { },
+  onClose: () => { },
   parseMessage: (message: MessageEvent) => {
     return ComputerMessage.parse(JSON.parse(message.toString()));
   },
@@ -376,13 +376,14 @@ export class Computer extends EventEmitter implements IComputer {
   public async do(
     objective: string,
     provider: 'anthropic' | 'custom' = 'anthropic'
-  ): Promise<void> {
+  ): Promise<any | null> {
     if (provider === 'custom') {
       throw new Error(
         'Custom providers are not supported for this method. Use the execute method instead.'
       );
     }
-    await useComputer(objective, this);
+    const messages = await useComputer(objective, this);
+    return messages || null;
   }
 
   /**

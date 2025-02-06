@@ -1,3 +1,4 @@
+import type { BetaContentBlockParam, BetaMessageParam, BetaToolResultBlockParam } from '@anthropic-ai/sdk/resources/beta/index.mjs';
 import pino from 'pino';
 
 const logger = pino({
@@ -22,3 +23,43 @@ export const createModuleLogger = (module: string) => {
 };
 
 export { logger };
+
+// Remove base64 image data from logs
+export const cleanContent = (content: any) => {
+  if (Array.isArray(content)) {
+    return content.map(c =>
+      c.type === 'image' ? { ...c, source: { ...c.source, data: '[base64 data omitted]' } } : c
+    );
+  }
+  return content;
+};
+
+// Clean tool results
+export const cleanToolResult = (toolResult: BetaToolResultBlockParam) => {
+  return {
+    ...toolResult,
+    content: cleanContent(toolResult.content)
+  };
+};
+
+export const cleanMessage = (message: BetaMessageParam) => {
+  const content = message.content;
+  if (!Array.isArray(content)) {
+    return message;
+  }
+
+  return {
+    ...message,
+    content: content.map(c => {
+      // Handle direct image content
+      if (c.type === 'image') {
+        return { ...c, source: { ...c.source, data: '[base64 data omitted]' } };
+      }
+      // Handle tool results containing images
+      if (c.type === 'tool_result') {
+        return cleanToolResult(c)
+      }
+      return c;
+    })
+  };
+}
