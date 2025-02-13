@@ -57,8 +57,8 @@ async function bash() {
   const message = await computer.execute({
     tool: 'bash',
     params: {
-      'command': 'echo Hello there'
-    }
+      command: 'echo Hello there',
+    },
   });
 
   logger.info(message);
