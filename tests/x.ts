@@ -1,5 +1,8 @@
+// This whole file is more like a scratchpad than a proper test file. Probably kill it eventually.
+
 import { Computer } from '../lib';
 import { ConnectOptions } from '../lib/computer';
+import { logger } from '../lib/utils';
 
 async function curl() {
   const computer = await Computer.create();
@@ -49,4 +52,16 @@ async function mcp() {
   console.log(tools);
 }
 
-await mcp();
+async function bash() {
+  const computer = await Computer.create();
+  const message = await computer.execute({
+    tool: 'bash',
+    params: {
+      'command': 'echo Hello there'
+    }
+  });
+
+  logger.info(message);
+}
+
+await bash();

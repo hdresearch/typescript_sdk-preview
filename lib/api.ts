@@ -34,7 +34,7 @@ export class HdrApi {
   constructor(hostname: string, apiKey: string | null) {
     this.apiKey = apiKey;
     this.paths = {
-      computerUse: path.join(hostname, 'hudson'),
+      computerUse: path.join(hostname, 'computer_use'),
       mcp: {
         base: path.join(hostname, 'mcp'),
         startServer: path.join(hostname, 'mcp', 'register_server'),
