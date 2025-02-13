@@ -21,7 +21,7 @@ type HdrApiPaths = {
   system: string;
 };
 
-enum Method {
+enum HeaderSet {
   Get,
   PostJson,
   PostFormData,
@@ -51,7 +51,7 @@ export class HdrApi {
   async useComputer(action: Action): Promise<ComputerMessage> {
     return fetchAndValidate(this.paths.computerUse, ComputerMessage, {
       method: 'POST',
-      headers: this.getHeaders(Method.PostJson),
+      headers: this.getHeaders(HeaderSet.PostJson),
       body: JSON.stringify(action),
     });
   }
@@ -70,7 +70,7 @@ export class HdrApi {
       StartServerResponseSchema,
       {
         method: 'POST',
-        headers: this.getHeaders(Method.PostJson),
+        headers: this.getHeaders(HeaderSet.PostJson),
         body: JSON.stringify(request),
       }
     );
@@ -82,7 +82,7 @@ export class HdrApi {
 
     return fetch(this.paths.file.upload, {
       method: 'POST',
-      headers: this.getHeaders(Method.PostFormData),
+      headers: this.getHeaders(HeaderSet.PostFormData),
       body: formData,
     });
   }
@@ -91,18 +91,18 @@ export class HdrApi {
     return `Bearer ${this.apiKey}`;
   }
 
-  private getHeaders(method: Method): HeadersInit {
+  private getHeaders(method: HeaderSet): HeadersInit {
     switch (method) {
-      case Method.Get:
+      case HeaderSet.Get:
         return {
           Authorization: this.getBearerToken(),
         };
-      case Method.PostJson:
+      case HeaderSet.PostJson:
         return {
           Authorization: this.getBearerToken(),
           'Content-Type': 'application/json',
         };
-      case Method.PostFormData:
+      case HeaderSet.PostFormData:
         return {
           Authorization: this.getBearerToken(),
           'Content-Type': 'multipart/form-data',

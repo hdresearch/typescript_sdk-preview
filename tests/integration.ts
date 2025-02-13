@@ -49,4 +49,4 @@ async function mcp() {
   console.log(tools);
 }
 
-await curl();
+await mcp();
