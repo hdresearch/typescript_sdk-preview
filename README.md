@@ -113,19 +113,28 @@ Execute arbitrary bash commands on the remote system.
 The main class for establishing connections and controlling remote computers.
 
 ```typescript
-class Computer extends EventEmitter implements IComputer {
-  constructor(
-    baseUrl: string,
-    apiKey: string,
-    options?: Partial<ComputerOptions>
-  );
+class Computer {
+  // Main factory method - use this to create instances
+  static create(options?: Partial<ComputerOptions>): Promise<Computer>;
 
   // Core methods
-  connect(): Promise<void>;
-  execute(command: Action): Promise<ComputerMessage>;
-  isConnected(): boolean;
-  close(): Promise<void>;
+  do(objective: string, provider?: 'anthropic' | 'custom'): Promise<void>;
   screenshot(): Promise<string>;
+
+  // Tool lists
+  listComputerUseTools(): BetaToolUnion[];
+  listMcpTools(): Promise<BetaTool[]>;
+  listAllTools(): Promise<BetaToolUnion[]>;
+
+  // MCP related operations
+  startMcpServer(name: string, command: string): Promise<StartServerResponse>;
+  callMcpTool(name: string, args?: Record<string, unknown>, resultSchema?: typeof CallToolResultSchema | typeof CompatibilityCallToolResultSchema, options?: RequestOptions);
+  getMcpServerCapabilities(): Promise<ServerCapabilities | undefined>;
+  getMcpServerVersion(): Promise<Implementation | undefined>;
+  mcpPing(): Promise<void>;
+
+  // File operations
+  putFile(path: string): Promise<Response>;  // Upload the file located at the given local path
 }
 ```
 
@@ -133,12 +142,10 @@ class Computer extends EventEmitter implements IComputer {
 
 ```typescript
 interface ComputerOptions {
-  onMessage?: (message: ComputerMessage) => void | Promise<void>;
-  parseMessage?: (message: MessageEvent) => void | ComputerMessage;
-  onOpen?: () => void | Promise<void>;
-  onError?: (error: Error) => void;
-  onClose?: (code: number, reason: string) => void;
-  beforeSend?: (data: unknown) => unknown;
+  baseUrl: string;           // HDR API base URL
+  apiKey: string | null;     // HDR API authentication key
+  tools: Set<BetaToolUnion>; // Available tools for computer control (you'll likely want to leave this default)
+  logOutput: boolean;        // Enable/disable logging
 }
 ```
 

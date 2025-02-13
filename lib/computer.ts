@@ -41,16 +41,6 @@ global.EventSource = EventSource;
 const logger = createModuleLogger('Computer');
 
 /**
- * Interface defining the core functionality for computer control operations
- */
-export interface IComputer {
-  /** Establishes an MCP connection to the computer control server */
-  connectMcp(): Promise<void>;
-  /** Executes a specified command action on the connected computer */
-  execute(command: Action): Promise<ComputerMessage>;
-}
-
-/**
  * Options that may be passed to Computer.connect()
  */
 export interface ConnectOptions {
@@ -92,9 +82,8 @@ const mcpClientInfo: Implementation = {
 /**
  * Main class for managing computer control operations through WebSocket, as well as MCP operations
  * @extends EventEmitter
- * @implements IComputer
  */
-export class Computer implements IComputer {
+export class Computer {
   private config: HDRConfig;
   private options: ComputerOptions;
   private mcpClient: Client | null = null;
@@ -154,9 +143,9 @@ export class Computer implements IComputer {
 
   /**
    * Establish MCP Client connection
-   * @public
+   * @private
    */
-  public async connectMcp(): Promise<void> {
+  private async connectMcp(): Promise<void> {
     const options: ClientOptions = {
       capabilities: {},
     };
