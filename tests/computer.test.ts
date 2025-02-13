@@ -4,31 +4,16 @@ import { bashTool } from '../lib/tools';
 import { computerTool } from '../lib/tools';
 import { StartServerResponse } from '../lib/types';
 
-const TEST_CONNECT_OPTIONS: ConnectOptions = {
-  wsUrl: 'http://localhost:8080/ws',
-  mcpUrl: 'http://localhost:8080/mcp',
-};
-
 describe('Computer Tests', () => {
   let computer: Computer;
 
   beforeAll(async () => {
-    computer = new Computer();
-    await computer.connect(TEST_CONNECT_OPTIONS);
-  });
-
-  afterAll(async () => {
-    await computer.close();
+    computer = await Computer.create();
   });
 
   describe('Computer Use Tests', () => {
-    it('should handle connect', async () => {
-      expect(computer.isConnected()).toBe(true);
-    });
-
-    it('should handle connection message', async () => {
+    it('should have computer use tools', async () => {
       expect(computer.sessionId).toBeDefined();
-      expect(await computer.getMetadata()).toBeDefined();
       const tools = computer.listComputerUseTools();
       expect(tools.find((tool) => tool.name == bashTool.name)?.type).toEqual(
         bashTool.type
@@ -131,9 +116,5 @@ describe('Computer Tests', () => {
       });
       expect(toolPromise).rejects.toThrow();
     });
-  });
-
-  afterAll(async () => {
-    await computer.close();
   });
 });

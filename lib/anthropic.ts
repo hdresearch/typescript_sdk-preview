@@ -70,13 +70,8 @@ export async function useComputer(
   // Create system prompt that tells Claude about the computer's capabilities
   const systemPrompt: BetaTextBlockParam = {
     type: 'text',
-    text: await systemCapability(await computer.getMetadata()),
+    text: await systemCapability(computer.machineMetadata),
   };
-
-  // Verify computer connection before proceeding
-  if (!computer.isConnected()) {
-    throw new Error('Failed to connect to computer');
-  }
 
   // Log available tools for debugging
   const tools = await computer.listAllTools();
@@ -129,14 +124,11 @@ export async function useComputer(
     }
   }
 
-
-
   // Clean up and log completion
   logger.info({ task }, 'Completed task: ');
-  const cleanedMessages = messages.map(cleanMessage)
+  const cleanedMessages = messages.map(cleanMessage);
 
   return cleanedMessages;
-
 }
 
 /**

@@ -169,7 +169,6 @@ try {
 
 - `HDR_API_KEY`: Your API key for authentication
 - `ANTHROPIC_API_KEY`: optional Anthropic key for high-level objective-oriented computer use
-- `HDR_WS_URL`: optional URL for computer use socket (defaults to 'wss://api.hdr.is/compute/ephemeral')
 
 ## Development
 
