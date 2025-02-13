@@ -59,7 +59,7 @@ interface ImageContent {
  * };
  * makeToolResult(result, "abc123");
  */
-export function makeToolResult(
+export function convertToolResult(
   result: ToolResult,
   toolUseId: string
 ): BetaToolResultBlockParam {

@@ -128,13 +128,20 @@ class Computer {
 
   // MCP related operations
   startMcpServer(name: string, command: string): Promise<StartServerResponse>;
-  callMcpTool(name: string, args?: Record<string, unknown>, resultSchema?: typeof CallToolResultSchema | typeof CompatibilityCallToolResultSchema, options?: RequestOptions);
+  callMcpTool(
+    name: string,
+    args?: Record<string, unknown>,
+    resultSchema?:
+      | typeof CallToolResultSchema
+      | typeof CompatibilityCallToolResultSchema,
+    options?: RequestOptions
+  );
   getMcpServerCapabilities(): Promise<ServerCapabilities | undefined>;
   getMcpServerVersion(): Promise<Implementation | undefined>;
   mcpPing(): Promise<void>;
 
   // File operations
-  putFile(path: string): Promise<Response>;  // Upload the file located at the given local path
+  putFile(path: string): Promise<Response>; // Upload the file located at the given local path
 }
 ```
 
@@ -142,10 +149,10 @@ class Computer {
 
 ```typescript
 interface ComputerOptions {
-  baseUrl: string;           // HDR API base URL
-  apiKey: string | null;     // HDR API authentication key
+  baseUrl: string; // HDR API base URL
+  apiKey: string | null; // HDR API authentication key
   tools: Set<BetaToolUnion>; // Available tools for computer control (you'll likely want to leave this default)
-  logOutput: boolean;        // Enable/disable logging
+  logOutput: boolean; // Enable/disable logging
 }
 ```
 

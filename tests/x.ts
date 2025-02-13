@@ -64,4 +64,7 @@ async function bash() {
   logger.info(message);
 }
 
-await bash();
+async function doBash() {
+  const computer = await Computer.create();
+  await computer.do('Tell me what the current path variable is.');
+}

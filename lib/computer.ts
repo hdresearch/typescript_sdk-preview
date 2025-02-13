@@ -8,7 +8,6 @@ import {
 
 import { bashTool, computerTool } from './tools';
 import { ComputerLogger } from './utils/computerLogger';
-import { createModuleLogger } from './utils/logger';
 import { Action } from './schemas/action';
 import { useComputer } from './anthropic';
 import {
@@ -29,16 +28,14 @@ import type {
   BetaToolUnion,
   BetaTool,
 } from '@anthropic-ai/sdk/resources/beta/index.mjs';
+import { fetchAndValidate } from './utils/fetchAndValidate';
+import path from 'path';
+import { HdrApi } from './api';
 
 // Polyfill is a workaround required by MCP SDK  - asebexen
 // Solution taken from https://github.com/pocketbase/pocketbase/discussions/3285
 import { EventSource } from 'eventsource';
-import { fetchAndValidate } from './utils/fetchAndValidate';
-import path from 'path';
-import { HdrApi } from './api';
 global.EventSource = EventSource;
-
-const logger = createModuleLogger('Computer');
 
 /**
  * Options that may be passed to Computer.connect()
@@ -161,8 +158,10 @@ export class Computer {
    * @returns {Promise<ComputerMessage>} Response message
    */
   public async execute(action: Action): Promise<ComputerMessage> {
-    logger.info({ action }, 'Sending action:');
-    return this.api.useComputer(action);
+    this.logger.logSend(action);
+    const message = await this.api.useComputer(action);
+    this.logger.logReceive(message);
+    return message;
   }
 
   /**
@@ -181,7 +180,7 @@ export class Computer {
       );
     }
     return useComputer(objective, this);
-  }
+  }    
 
   /**
    * Updates the last activity timestamp
