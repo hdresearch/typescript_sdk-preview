@@ -135,7 +135,10 @@ export async function useComputer(
  * @param computer - The computer instance
  * @returns {Promise<BetaToolResultBlockParam>} - The tool result
  */
-async function handleToolRequest(block: BetaToolUseBlock, computer: Computer): Promise<BetaToolResultBlockParam> {
+async function handleToolRequest(
+  block: BetaToolUseBlock,
+  computer: Computer
+): Promise<BetaToolResultBlockParam> {
   // Try to parse as computer use action
   const parseAction = Action.safeParse({
     tool: block.name,
@@ -145,9 +148,9 @@ async function handleToolRequest(block: BetaToolUseBlock, computer: Computer): P
   if (parseAction.success) {
     logger.debug(parseAction.data, 'Parsed action:');
     return convertToolResult(
-        (await computer.execute(parseAction.data)).tool_result,
-        block.id
-      );
+      (await computer.execute(parseAction.data)).tool_result,
+      block.id
+    );
   }
 
   // Try to parse as MCP (unknown) action
@@ -158,17 +161,15 @@ async function handleToolRequest(block: BetaToolUseBlock, computer: Computer): P
 
   if (parseUnknownAction.success) {
     logger.debug(parseUnknownAction.data, 'Parsed unknown action:');
-      const result = await computer.callMcpTool(
-        parseUnknownAction.data.tool,
-        parseUnknownAction.data.params
-      );
+    const result = await computer.callMcpTool(
+      parseUnknownAction.data.tool,
+      parseUnknownAction.data.params
+    );
     const toolResult: ToolResultBlockParam = {
       tool_use_id: block.id,
       type: 'tool_result',
       content: JSON.stringify(result.content),
-      is_error: result.isError
-        ? Boolean(result.isError)
-        : undefined,
+      is_error: result.isError ? Boolean(result.isError) : undefined,
     };
     return toolResult;
   }

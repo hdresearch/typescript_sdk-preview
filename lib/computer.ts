@@ -180,7 +180,7 @@ export class Computer {
       );
     }
     return useComputer(objective, this);
-  }    
+  }
 
   /**
    * Updates the last activity timestamp

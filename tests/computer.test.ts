@@ -43,7 +43,7 @@ describe('Computer Tests', () => {
         tool: 'bash',
         params: { command: 'echo hello world' },
       });
-      expect(message.tool_result.output).toBe('hello world');
+      expect(message.tool_result.output).toBe('hello world\n');
     });
 
     it('should handle move mouse', async () => {

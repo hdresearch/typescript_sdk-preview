@@ -54,17 +54,25 @@ async function mcp() {
 
 async function bash() {
   const computer = await Computer.create();
-  const message = await computer.execute({
-    tool: 'bash',
-    params: {
-      command: 'echo Hello there',
-    },
-  });
-
-  logger.info(message);
+  for (let i = 0; i < 5; i++) {
+    const message = await computer.execute({
+      tool: 'bash',
+      params: {
+        command: 'echo Hello there',
+      },
+    });
+    logger.info(message);
+  }
 }
 
 async function doBash() {
   const computer = await Computer.create();
   await computer.do('Tell me what the current path variable is.');
 }
+
+async function bigCurl() {
+  const computer = await Computer.create();
+  await computer.do('Curl google.com');
+}
+
+await bigCurl();
