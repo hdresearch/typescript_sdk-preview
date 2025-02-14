@@ -1,18 +1,13 @@
-import { WebSocket, type MessageEvent } from 'ws';
 import { readFile } from 'fs/promises';
 import {
   ComputerMessage,
   HDRConfig,
   MachineMetadata,
-  StartServerResponseSchema,
-  type StartServerRequest,
   type StartServerResponse,
 } from './types';
 
 import { bashTool, computerTool } from './tools';
 import { ComputerLogger } from './utils/computerLogger';
-import { createModuleLogger } from './utils/logger';
-import { EventEmitter } from 'events';
 import { Action } from './schemas/action';
 import { useComputer } from './anthropic';
 import {
@@ -33,40 +28,19 @@ import type {
   BetaToolUnion,
   BetaTool,
 } from '@anthropic-ai/sdk/resources/beta/index.mjs';
+import { fetchAndValidate } from './utils/fetchAndValidate';
+import path from 'path';
+import { HdrApi } from './api';
 
 // Polyfill is a workaround required by MCP SDK  - asebexen
 // Solution taken from https://github.com/pocketbase/pocketbase/discussions/3285
 import { EventSource } from 'eventsource';
 global.EventSource = EventSource;
 
-const EVENT_METADATA_READY = 'machine-metadata-ready';
-import {
-  getFileUrl,
-  getMcpUrl as getMcpUrl,
-  getStreamUrl,
-  getWSSUrl,
-} from './utils/urls';
-
-const logger = createModuleLogger('Computer');
-
-/**
- * Interface defining the core functionality for computer control operations
- */
-export interface IComputer {
-  /** Establishes a WebSocket connection to the computer control server */
-  connect(): Promise<void>;
-  /** Executes a specified command action on the connected computer */
-  execute(command: Action): Promise<ComputerMessage>;
-  /** Checks if the WebSocket connection is currently active */
-  isConnected(): boolean;
-}
-
 /**
  * Options that may be passed to Computer.connect()
  */
 export interface ConnectOptions {
-  /** Override the default WS URL, which is derived from Computer.options */
-  wsUrl?: string;
   /** Override the default MCP URL, which is derived from Computer.options */
   mcpUrl?: string;
 }
@@ -76,24 +50,12 @@ export interface ConnectOptions {
  */
 export interface ComputerOptions {
   /** Vers Server base URL */
-  baseUrl?: string;
+  baseUrl: string;
   /** HDR API key for authentication */
-  apiKey?: string;
+  apiKey: string | null;
   /** Set of available tools for computer control */
-  tools?: Set<BetaToolUnion>;
-  logOutput?: boolean;
-  /** Callback function for handling incoming messages */
-  onMessage: (message: ComputerMessage) => void | Promise<void>;
-  /** Function to parse incoming WebSocket messages */
-  parseMessage: (message: MessageEvent) => void | ComputerMessage;
-  /** Callback function triggered when connection is established */
-  onOpen?: () => void | Promise<void>;
-  /** Error handling callback */
-  onError?: (error: Error) => void;
-  /** Callback function for connection closure */
-  onClose?: (code: number, reason: string) => void;
-  /** Pre-processing function for outgoing data */
-  beforeSend?: (data: unknown) => unknown;
+  tools: Set<BetaToolUnion>;
+  logOutput: boolean;
 }
 
 /**
@@ -101,15 +63,9 @@ export interface ComputerOptions {
  */
 const defaultOptions: ComputerOptions = {
   baseUrl: process.env.HDR_BASE_URL || 'https://api.hdr.is/compute/',
+  apiKey: process.env.HDR_API_KEY ?? null,
   tools: new Set([bashTool, computerTool]),
   logOutput: true,
-  onOpen: () => { },
-  onMessage: () => { },
-  onError: () => { },
-  onClose: () => { },
-  parseMessage: (message: MessageEvent) => {
-    return ComputerMessage.parse(JSON.parse(message.toString()));
-  },
 };
 
 /**
@@ -123,248 +79,89 @@ const mcpClientInfo: Implementation = {
 /**
  * Main class for managing computer control operations through WebSocket, as well as MCP operations
  * @extends EventEmitter
- * @implements IComputer
  */
-export class Computer extends EventEmitter implements IComputer {
+export class Computer {
   private config: HDRConfig;
   private options: ComputerOptions;
-  private ws: WebSocket | null = null;
   private mcpClient: Client | null = null;
   private logger: ComputerLogger;
   createdAt: string;
   updatedAt: string | null = null;
   sessionId: string | null = null;
-  /** Use Computer.getMetadata() to get - metadata is set on connect() invocation via welcome message */
-  private machineMetadata: MachineMetadata | null = null;
+  machineMetadata: MachineMetadata;
+  api: HdrApi;
 
   /**
-   * Creates a new Computer instance
-   * @param {Partial<ComputerOptions>} options - Configuration options for the computer control interface
+   * You probably want to await Computer.create instead.
    */
-  constructor(options: Partial<ComputerOptions> = {}) {
-    super();
-    this.options = { ...defaultOptions, ...options };
+  constructor(options: ComputerOptions, machineMetadata: MachineMetadata) {
+    this.options = options;
+    this.machineMetadata = machineMetadata;
     this.config = HDRConfig.parse({
       base_url: this.options.baseUrl,
       api_key: this.options.apiKey,
     });
     this.logger = new ComputerLogger();
     this.createdAt = new Date().toISOString();
-
-    this.setupEventHandlers();
+    this.api = new HdrApi(this.getHostname(), this.options.apiKey);
   }
 
-  /**
-   * Sets up event handlers for WebSocket events
-   * @private
-   */
-  private setupEventHandlers() {
-    this.on('open', this.onOpen);
-    this.on('message', this.onMessage);
-    this.on('error', this.onError);
-    this.on('close', this.onClose);
-  }
-
-  /**
-   * Handles WebSocket open event
-   * @private
-   */
-  private onOpen() {
-    this.options.onOpen?.();
-  }
-
-  /**
-   * Parses incoming WebSocket messages
-   * @param {MessageEvent} message - Raw WebSocket message
-   * @returns {ComputerMessage} Parsed message object
-   * @private
-   */
-  private parseMessage(message: MessageEvent): ComputerMessage {
-    this.options.parseMessage(message);
-    return ComputerMessage.parse(JSON.parse(message.toString()));
-  }
-
-  /**
-   * Processes incoming WebSocket messages
-   * @param {MessageEvent} message - WebSocket message event
-   * @private
-   */
-  private onMessage(message: MessageEvent) {
-    const parsedMessage = this.parseMessage(message);
-    this.setUpdatedAt(parsedMessage.metadata.response_timestamp.getTime());
-    if (this.options.logOutput) {
-      this.logger.logReceive(parsedMessage);
+  static async create(
+    options: Partial<ComputerOptions> = {}
+  ): Promise<Computer> {
+    const optionsWithDefaults: ComputerOptions = {
+      ...defaultOptions,
+      ...options,
+    };
+    if (process.env.HOSTNAME_OVERRIDE) {
+      optionsWithDefaults.baseUrl = process.env.HOSTNAME_OVERRIDE;
     }
-    this.handleConnectionMessage(parsedMessage);
-    this.options.onMessage(parsedMessage);
-  }
 
-  /**
-   * Handles WebSocket error events
-   * @param {Error} error - Error object
-   * @private
-   */
-  private onError(error: Error) {
-    logger.error(`Error: ${error.message}`);
-    this.options.onError?.(error);
-  }
+    const resourceUrl = process.env.HOSTNAME_OVERRIDE
+      ? new HdrApi(process.env.HOSTNAME_OVERRIDE, null).paths.system
+      : `${optionsWithDefaults.baseUrl}/connect`;
 
-  /**
-   * Handles WebSocket close events
-   * @param {number} code - Close status code
-   * @param {string} reason - Close reason
-   * @private
-   */
-  private onClose(code: number, reason: string) {
-    logger.info(`Connection closed: ${code} ${reason}`);
-    this.options.onClose?.(code, reason);
-  }
-
-  /**
-   * Processes connection-related messages and updates machine metadata
-   * @param {ComputerMessage} message - Parsed computer message
-   * @private
-   */
-  private handleConnectionMessage(message: ComputerMessage) {
-    const tryParse = MachineMetadata.safeParse(
-      JSON.parse(message.tool_result.system ?? '{}')
+    // Request resources from the server
+    const machineMetadata = await fetchAndValidate(
+      resourceUrl,
+      MachineMetadata,
+      {
+        headers: {
+          Authorization: `Bearer ${optionsWithDefaults.apiKey}`,
+        },
+      }
     );
 
-    if (tryParse.success) {
-      const machineMetadata = tryParse.data;
-      this.machineMetadata = machineMetadata;
-      this.sessionId = message.metadata.session_id;
+    const computer = new Computer(optionsWithDefaults, machineMetadata);
+    await computer.connectMcp();
 
-      const updatedComputerTool = {
-        ...computerTool,
-        display_height_px: machineMetadata.display_height ?? 0,
-        display_width_px: machineMetadata.display_width ?? 0,
-      };
-
-      this.options.tools?.delete(computerTool);
-      this.options.tools?.add(updatedComputerTool);
-
-      this.emit(EVENT_METADATA_READY);
-    }
-  }
-
-  /**
-   * Establishes WebSocket and SSE (MCP) connection, optionally overriding default connection URLs
-   * @returns {Promise<void[]>}
-   */
-  public async connect(options?: ConnectOptions): Promise<void> {
-    await this.connectWS(options?.wsUrl);
-    await this.connectMcpClient(options?.mcpUrl);
-  }
-
-  /**
-   * Establish WebSocket connection
-   * @private
-   */
-  private async connectWS(url?: string): Promise<void> {
-    return new Promise<void>((resolve, reject) => {
-      const wsUrl = url || getWSSUrl(this.config.base_url);
-      logger.info(`Connecting to ${wsUrl}`);
-      this.ws = new WebSocket(wsUrl, {
-        headers: { Authorization: `Bearer ${this.config.api_key}` },
-      });
-
-      this.ws.on('open', () => {
-        this.emit('connected');
-        resolve();
-      });
-
-      this.ws.on('message', (message) => {
-        this.emit('message', message);
-      });
-
-      this.ws.on('error', (error) => {
-        this.emit('error', error);
-        reject(error);
-      });
-
-      this.ws.on('close', (code, reason) => {
-        this.emit('close', code, reason);
-        reject(new Error(`Connection closed: ${code} ${reason}`));
-      });
-    });
+    return computer;
   }
 
   /**
    * Establish MCP Client connection
    * @private
    */
-  private async connectMcpClient(url?: string): Promise<void> {
+  private async connectMcp(): Promise<void> {
     const options: ClientOptions = {
       capabilities: {},
     };
     this.mcpClient = new Client(mcpClientInfo, options);
+    const transport = new SSEClientTransport(new URL(this.api.paths.mcp.base));
 
-    const metadata = await this.getMetadata();
-    const mcpUrl = url || getMcpUrl(this.config.base_url, metadata.machine_id);
-    const transport = new SSEClientTransport(new URL(mcpUrl));
-
-    await this.mcpClient.connect(transport);
-  }
-
-  /**
-   * Returns the hostname of the machine, based on the machine_id received in the welcome message.
-   * @private
-   */
-  private getHostname(): string {
-    if (!this.machineMetadata)
-      throw new Error(
-        'Unable to resolve hostname; Computer.machineMetadata is null'
-      );
-    else if (this.machineMetadata.machine_id === null) {
-      console.warn(
-        'Remote machine returned a null machine_id; unless this is intentional, this should be regarded as a server-side error'
-      );
-      return 'http://localhost:8080';
-    } else
-      return `https://api.hdr.is/compute/${this.machineMetadata.machine_id}`;
-  }
-
-  /**
-   * Sends data through WebSocket connection
-   * @param {Action} data - Action to be sent
-   * @returns {Promise<void>}
-   * @private
-   */
-  private async sendWS(data: Action): Promise<void> {
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-      throw new Error('WebSocket is not connected');
-    }
-
-    if (this.options.logOutput) {
-      this.logger.logSend(data);
-    }
-
-    const processed = this.options.beforeSend?.(data) ?? data;
-    const message =
-      typeof processed === 'string' ? processed : JSON.stringify(processed);
-    this.ws?.send(message);
+    return this.mcpClient.connect(transport);
   }
 
   /**
    * Executes a command and waits for response
-   * @param {Action} command - Command to execute
+   * @param {Action} action - Command to execute
    * @returns {Promise<ComputerMessage>} Response message
    */
-  public async execute(command: Action): Promise<ComputerMessage> {
-    await this.ensureConnected();
-    logger.info({ command }, 'Sending command:');
-
-    return new Promise((resolve) => {
-      const handleMessage = (message: MessageEvent) => {
-        const response = this.parseMessage(message);
-        this.removeListener('message', handleMessage);
-        resolve(response);
-      };
-
-      this.addListener('message', handleMessage);
-      this.sendWS(command);
-    });
+  public async execute(action: Action): Promise<ComputerMessage> {
+    this.logger.logSend(action);
+    const message = await this.api.useComputer(action);
+    this.logger.logReceive(message);
+    return message;
   }
 
   /**
@@ -376,14 +173,13 @@ export class Computer extends EventEmitter implements IComputer {
   public async do(
     objective: string,
     provider: 'anthropic' | 'custom' = 'anthropic'
-  ): Promise<any | null> {
+  ) {
     if (provider === 'custom') {
       throw new Error(
         'Custom providers are not supported for this method. Use the execute method instead.'
       );
     }
-    const messages = await useComputer(objective, this);
-    return messages || null;
+    return useComputer(objective, this);
   }
 
   /**
@@ -393,33 +189,6 @@ export class Computer extends EventEmitter implements IComputer {
    */
   private setUpdatedAt(timestamp: number) {
     this.updatedAt = new Date(timestamp).toISOString();
-  }
-
-  /**
-   * Ensures WebSocket connection is established
-   * @private
-   */
-  private async ensureConnected() {
-    if (!this.isConnected()) {
-      await this.connect();
-    }
-  }
-
-  /**
-   * Checks if WebSocket connection is active
-   * @returns {boolean} Connection status
-   */
-  public isConnected(): boolean {
-    return this.ws?.readyState === WebSocket.OPEN;
-  }
-
-  /**
-   * Closes the WebSocket connection
-   * @returns {Promise<void>}
-   */
-  public async close() {
-    this.ws?.close();
-    this.ws = null;
   }
 
   /**
@@ -468,31 +237,7 @@ export class Computer extends EventEmitter implements IComputer {
         'MCP Client not connected; have you called Computer.connect()?'
       );
 
-    const url = `${this.getHostname()}/mcp/register_server`;
-
-    const request: StartServerRequest = {
-      name,
-      command,
-    };
-
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(request),
-    });
-
-    if (!response.ok) {
-      throw new Error(
-        `${response.status} ${response.statusText}: ${await response.text()}`
-      );
-    }
-
-    const serverInfo = await StartServerResponseSchema.parse(
-      await response.json()
-    );
-    return serverInfo;
+    return this.api.startMcpServer(name, command);
   }
 
   public async callMcpTool(
@@ -524,6 +269,7 @@ export class Computer extends EventEmitter implements IComputer {
         'MCP Client not connected; have you called Computer.connect()?'
       );
     return this.mcpClient.listTools().then((x) =>
+      // Rename inputSchema to input_schema
       x.tools.map((tool) => {
         const { inputSchema, ...rest } = tool;
         const betaTool: BetaTool = {
@@ -568,76 +314,12 @@ export class Computer extends EventEmitter implements IComputer {
     return [...this.listComputerUseTools(), ...(await this.listMcpTools())];
   }
 
-  /**
-   * Waits for machine metadata to be available
-   * @param {number} timeoutMs - Maximum time to wait in milliseconds (default: 10000)
-   * @throws {Error} If metadata is not available within timeout period
-   * @public
-   */
-  public async getMetadata(
-    timeoutMs: number = 10000
-  ): Promise<MachineMetadata> {
-    return new Promise<MachineMetadata>((resolve, reject) => {
-      if (this.machineMetadata) {
-        resolve(this.machineMetadata);
-      }
-
-      const timeoutHandle = setTimeout(
-        () => reject('Timed out while waiting for welcome message'),
-        timeoutMs
-      );
-
-      const cleanup = () => {
-        clearTimeout(timeoutHandle);
-        this.removeListener(EVENT_METADATA_READY, onReady);
-      };
-
-      const onReady = () => {
-        cleanup();
-        if (!this.machineMetadata)
-          throw new Error(
-            `Computer emitted '${EVENT_METADATA_READY}' but metadata is not ready.`
-          );
-        resolve(this.machineMetadata);
-      };
-
-      this.on(EVENT_METADATA_READY, onReady);
-    });
-  }
-  /**
-   * Gets the URL for streaming video from the connected computer
-   * @returns {Promise<string>} URL for accessing the video stream
-   * @throws {Error} If computer is not connected or metadata is unavailable
-   */
-  public async videoStreamUrl() {
-    if (!this.isConnected()) {
-      throw new Error('Computer is not connected.');
-    }
-
-    const machineMetadata = await this.getMetadata();
-    if (!machineMetadata.machine_id)
-      throw new Error(
-        'Failed to get video stream URL; machine does not have a machine ID'
-      );
-
-    return getStreamUrl(this.config.base_url, machineMetadata.machine_id);
-  }
-
   public async putFile(path: string) {
-    const machineMetadata = await this.getMetadata();
-    const url = getFileUrl(this.config.base_url, machineMetadata.machine_id);
-
     const file = await readFile(path);
-    const formData = new FormData();
-    const filename = path.split('/').pop();
-    formData.append('file', new Blob([file]), filename);
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${this.config.api_key}`,
-      },
-      body: formData,
-    });
+    const pathParts = path.split('/');
+    const filename = pathParts[pathParts.length - 1];
+
+    const response = await this.api.uploadFile(filename, new Blob([file]));
 
     if (!response.ok) {
       throw new Error(
@@ -646,5 +328,21 @@ export class Computer extends EventEmitter implements IComputer {
     }
 
     return response;
+  }
+
+  getHostname(): string {
+    if (process.env.HOSTNAME_OVERRIDE) {
+      return process.env.HOSTNAME_OVERRIDE;
+    } else if (this.machineMetadata.machine_id) {
+      return path.join(
+        'https://api.hdr.is',
+        'compute',
+        this.machineMetadata.machine_id
+      );
+    } else {
+      throw new Error(
+        'Unable to resolve hostname: machine_id is null and HOSTNAME_OVERRIDE is unset.'
+      );
+    }
   }
 }

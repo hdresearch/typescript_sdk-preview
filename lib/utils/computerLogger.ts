@@ -72,8 +72,10 @@ export class ComputerLogger {
       ...message,
       tool_result: {
         ...message.tool_result,
-        base64_image: message.tool_result.base64_image ? '[base64 image data]' : null
-      }
+        base64_image: message.tool_result.base64_image
+          ? '[base64 image data]'
+          : null,
+      },
     };
 
     logger.debug(`Logging message: ${JSON.stringify(messageForLogging)}`);

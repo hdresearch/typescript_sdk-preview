@@ -9,19 +9,13 @@ const TMPDIR = '/tmp';
 const FILEPATH = join(TMPDIR, 'hdr_typescript_sdk_test.txt');
 const FILEPATH_FAKE = join(TMPDIR, 'hdr_typescript_sdk_does_not_exist.txt');
 
-const TEST_CONNECT_OPTIONS: ConnectOptions = {
-  wsUrl: 'http://localhost:8080/ws',
-  mcpUrl: 'http://localhost:8080/mcp',
-};
-
 describe('Edit tests', () => {
   let computer: Computer;
 
   beforeAll(async () => {
     await cleanTempFiles();
 
-    computer = new Computer();
-    await computer.connect(TEST_CONNECT_OPTIONS);
+    computer = await Computer.create();
   });
 
   afterAll(async () => {

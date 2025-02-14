@@ -14,8 +14,8 @@ import {
   MachineMetadata,
   type DefaultSamplingOptions,
 } from '../lib/types';
-import { logger, cleanToolResult, cleanMessage } from '../lib/utils/logger';
-import { makeToolResult } from './tools';
+import { logger, cleanMessage } from '../lib/utils/logger';
+import { convertToolResult } from './tools';
 import { ToolResult } from '../lib/types';
 import { UnknownAction } from './schemas/unknownAction';
 import type { ToolResultBlockParam } from '@anthropic-ai/sdk/resources/index.mjs';
@@ -57,6 +57,7 @@ export async function useComputer(
   // Merge provided options with defaults
   const samplingOptions = { ...defaultSamplingOptions, ...options };
   const client = new Anthropic();
+  const tools = await computer.listAllTools();
 
   // Initialize conversation history
   const messages: BetaMessageParam[] = [];
@@ -70,17 +71,8 @@ export async function useComputer(
   // Create system prompt that tells Claude about the computer's capabilities
   const systemPrompt: BetaTextBlockParam = {
     type: 'text',
-    text: await systemCapability(await computer.getMetadata()),
+    text: systemCapability(computer.machineMetadata),
   };
-
-  // Verify computer connection before proceeding
-  if (!computer.isConnected()) {
-    throw new Error('Failed to connect to computer');
-  }
-
-  // Log available tools for debugging
-  const tools = await computer.listAllTools();
-  logger.info({ tools }, 'Tools enabled: ');
 
   // Main interaction loop
   while (true) {
@@ -107,7 +99,7 @@ export async function useComputer(
       } else if (content.type === 'tool_use') {
         // Execute and log tool usage
         logger.info({ command: content }, 'Executing: ');
-        toolResults.push(...(await handleToolRequest(content, computer)));
+        toolResults.push(await handleToolRequest(content, computer));
       }
     }
 
@@ -129,14 +121,11 @@ export async function useComputer(
     }
   }
 
-
-
   // Clean up and log completion
   logger.info({ task }, 'Completed task: ');
-  const cleanedMessages = messages.map(cleanMessage)
+  const cleanedMessages = messages.map(cleanMessage);
 
   return cleanedMessages;
-
 }
 
 /**
@@ -144,68 +133,55 @@ export async function useComputer(
  *
  * @param block - The tool use request from Claude
  * @param computer - The computer instance
- * @returns {Promise<BetaToolResultBlockParam[]>} - The tool results
+ * @returns {Promise<BetaToolResultBlockParam>} - The tool result
  */
-async function handleToolRequest(block: BetaToolUseBlock, computer: Computer) {
-  const toolResults: BetaToolResultBlockParam[] = [];
+async function handleToolRequest(
+  block: BetaToolUseBlock,
+  computer: Computer
+): Promise<BetaToolResultBlockParam> {
+  // Try to parse as computer use action
+  const parseAction = Action.safeParse({
+    tool: block.name,
+    params: block.input,
+  });
 
-  // Select an executor function based on the shape of the 'block'
-  const execute = (() => {
-    const parseAction = Action.safeParse({
-      tool: block.name,
-      params: block.input,
-    });
-
-    if (parseAction.success) {
-      logger.debug(parseAction.data, 'Parsed action:');
-      return async () =>
-        makeToolResult(
-          (await computer.execute(parseAction.data)).tool_result,
-          block.id
-        );
-    }
-
-    const parseUnknownAction = UnknownAction.safeParse({
-      tool: block.name,
-      params: block.input,
-    });
-
-    if (parseUnknownAction.success) {
-      logger.debug(parseUnknownAction.data, 'Parsed unknown action:');
-      return async () => {
-        const toolResult = await computer.callMcpTool(
-          parseUnknownAction.data.tool,
-          parseUnknownAction.data.params
-        );
-        const result: ToolResultBlockParam = {
-          tool_use_id: block.id,
-          type: 'tool_result',
-          content: JSON.stringify(toolResult.content),
-          is_error: toolResult.isError
-            ? Boolean(toolResult.isError)
-            : undefined,
-        };
-        return result;
-      };
-    }
-
-    const result = ToolResult.parse({
-      error: `Tool ${block.name} failed is invalid`,
-      output: null,
-      base64_image: null,
-      system: null,
-    });
-    const errorResult = makeToolResult(result, block.id);
-    logger.debug({ tool_use_error: errorResult }, 'Could not parse tool use');
-    toolResults.push(errorResult);
-    return null;
-  })();
-
-  if (execute) {
-    const toolResult = await execute();
-    logger.info(cleanToolResult(toolResult), 'Tool Result:');
-    toolResults.push(toolResult);
+  if (parseAction.success) {
+    logger.debug(parseAction.data, 'Parsed action:');
+    return convertToolResult(
+      (await computer.execute(parseAction.data)).tool_result,
+      block.id
+    );
   }
 
-  return toolResults;
+  // Try to parse as MCP (unknown) action
+  const parseUnknownAction = UnknownAction.safeParse({
+    tool: block.name,
+    params: block.input,
+  });
+
+  if (parseUnknownAction.success) {
+    logger.debug(parseUnknownAction.data, 'Parsed unknown action:');
+    const result = await computer.callMcpTool(
+      parseUnknownAction.data.tool,
+      parseUnknownAction.data.params
+    );
+    const toolResult: ToolResultBlockParam = {
+      tool_use_id: block.id,
+      type: 'tool_result',
+      content: JSON.stringify(result.content),
+      is_error: result.isError ? Boolean(result.isError) : undefined,
+    };
+    return toolResult;
+  }
+
+  // Return error result
+  const result: ToolResult = {
+    error: `Tool ${block.name} failed is invalid`,
+    output: null,
+    base64_image: null,
+    system: null,
+  };
+  const errorResult = convertToolResult(result, block.id);
+  logger.debug({ tool_use_error: errorResult }, 'Could not parse tool use');
+  return errorResult;
 }
